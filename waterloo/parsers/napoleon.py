@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import logging
 import re
 import sys
 from functools import partial
@@ -12,10 +13,11 @@ from megaparsy.char.lexer import (
     IndentMany,
     IndentSome,
     line_fold,
-    non_indented,
 )
-from megaparsy.utils import try_
+from megaparsy.utils import try_, debug
 import parsy
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 # parser which matches whitespace, including newline
@@ -24,13 +26,14 @@ scn = space(char.space1)
 # parser which only matches ' ' and '\t', but *not* newlines
 _space_no_nl = parsy.regex(r'( |\t)*').result('')
 _space1_no_nl = parsy.regex(r'( |\t)+').result('')
+_non_space = parsy.regex(r'\S')
 sc = space(_space1_no_nl)
 
 # factory for parser returning tokens separated by no-newline whitespace
 lexeme = partial(megaparsy_lexeme, p_space=sc)
 
 
-section_name = parsy.regex('Args|Kwargs')
+section_name = parsy.regex('Args|Kwargs').result('Args')
 
 args_head = section_name << parsy.string(':') << (_space_no_nl + char.eol)
 
@@ -40,17 +43,21 @@ type_def = lexeme(
     parsy.string('(') >> parsy.regex(r'[^)]+') << parsy.regex(r'\)\:?')
 )
 
-arg_type = parsy.seq(arg=var_name, type=type_def)  # needs Py 3.6+
+arg_type = parsy.seq(arg=var_name, type=type_def)  # kwargs needs Py 3.6+
 
 rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
 
+# consume any line that is not an `args_head`
+ignored_line = (
+    (_space_no_nl >> args_head).should_fail('not `args_head`') >>
+    rest_of_line >>
+    char.eol
+).result('')
 
-_token = parsy.regex(r'[a-zA-Z0-9\-]+')
-p_item_factory = partial(lexeme, _token)
-p_item = p_item_factory().desc('list')
+
+p_arg_item = arg_type << rest_of_line
 
 
-# sub-lists
 def _line_fold_callback(sc_):
     """
     "The second argument to `line_fold` is a callback that receives a
@@ -63,12 +70,11 @@ def _line_fold_callback(sc_):
     @parsy.generate
     def _line_fold_callback_inner():
         """
-        My understanding of the Haskell original of this callback is:
-        taking a list of `p_item`-like tokens found at current-or-greater
-        indent and joining them with ' '
+        folded lines are the wrapped description for an arg
         """
-        items = yield megaparsy_lexeme(_token, p_space=sc_).at_least(1)
-        return ' '.join(items)
+        p_folded = ((_non_space + rest_of_line) << sc_)
+        folded = yield p_folded.at_least(1)
+        return folded
 
     return _line_fold_callback_inner << sc
 
@@ -77,35 +83,22 @@ p_line_fold = line_fold(scn, _line_fold_callback)
 
 
 @parsy.generate
-def _complex_item_block():
-    header = yield p_item
-    return IndentMany(indent=None, f=lambda val: (header, val), p=p_line_fold)
+def _arg_items_block():
+    head = yield p_arg_item
+    # in this case the 'tail' would be the folded arg description
+    return IndentMany(indent=None, f=lambda _: head, p=p_line_fold)
 
 
-# parser matching list item and its indented children
-p_complex_item = indent_block(scn, _complex_item_block)
+p_arg_items = indent_block(scn, _arg_items_block)
 
 
 @parsy.generate
 def _args_list_block():
-    """
-    return (L.IndentSome Nothing (return . (header, )) pComplexItem)
-
-    (return . (header, ))
-            ^ means 'function composition'
-    """
-    header = yield p_item
-    return IndentSome(indent=None, f=lambda val: (header, val), p=p_complex_item)
+    head = yield section_name << parsy.string(':') << _space_no_nl
+    return IndentSome(indent=None, f=lambda tail: (head, tail), p=p_arg_items)
 
 
-# consume lines until an `args_head` is reached
-ignored_line = (
-    (_space_no_nl >> args_head).should_fail('not `args_head`') >>
-    rest_of_line >>
-    char.eol
-).result('')
-
-p_arg_list = non_indented(scn, indent_block(scn, _args_list_block))
+p_arg_list = indent_block(scn, _args_list_block)
 
 
 args_parser = p_arg_list << parsy.regex(r'.*', re.DOTALL)

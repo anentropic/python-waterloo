@@ -7,6 +7,7 @@ from waterloo.parsers.napoleon import (
     arg_type,
     rest_of_line,
     ignored_line,
+    p_arg_list,
 )
 
 
@@ -66,6 +67,40 @@ def test_ignored_lines():
     assert remainder == """    Args:
         key (str): identifying a specific token bucket
 """
+
+
+def test_p_arg_list():
+    example = """
+        Kwargs:
+            key (str): identifying a specific token bucket
+            num_tokens (int): will block without consuming any tokens until
+                this amount are available to be consumed
+            timeout (int): seconds to block for
+            retry_interval (Optional[float]): how long to wait between polling
+                for tokens to be available. `None` means use default interval
+                which is equal to time needed to replenish `num_tokens`.
+    """
+    result = p_arg_list.parse(example)
+    head, arg_list = result
+    assert head == 'Args'
+    assert arg_list == [
+        {
+            'arg': 'key',
+            'type': 'str',
+        },
+        {
+            'arg': 'num_tokens',
+            'type': 'int',
+        },
+        {
+            'arg': 'timeout',
+            'type': 'int',
+        },
+        {
+            'arg': 'retry_interval',
+            'type': 'Optional[float]',
+        },
+    ]
 
 
 @pytest.mark.skip
