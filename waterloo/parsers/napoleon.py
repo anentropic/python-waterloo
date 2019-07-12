@@ -14,7 +14,7 @@ from megaparsy.char.lexer import (
     IndentSome,
     line_fold,
 )
-from megaparsy.utils import try_, debug
+from megaparsy.control.applicative.combinators import between
 import parsy
 
 logging.basicConfig(level=logging.DEBUG)
@@ -37,13 +37,31 @@ section_name = parsy.regex('Args|Kwargs').result('Args')
 
 args_head = section_name << parsy.string(':') << (_space_no_nl + char.eol)
 
-var_name = lexeme(parsy.regex(r'[a-zA-Z]\w*'))
+var_name = lexeme(parsy.regex(r'\*{0,2}[a-zA-Z]\w*'))
 
-type_def = lexeme(
-    parsy.string('(') >> parsy.regex(r'[^)]+') << parsy.regex(r'\)\:?')
+dotted_var_path = lexeme(parsy.regex(r'[a-zA-Z][\w\.]*'))
+
+
+@parsy.generate
+def _nested():
+    return (
+        yield between(
+            parsy.regex(r'\[\s*'),
+            parsy.regex(r',?\s*\]'),  # allow line-breaks and trailing-comma
+            type_def.sep_by(parsy.regex(r',\s*')),  # includes new-lines
+        )
+    )
+
+
+_type_token = dotted_var_path | parsy.string('...')
+type_def = parsy.seq(_type_token, _nested) | _type_token | _nested
+
+
+arg_type_def = lexeme(
+    parsy.string('(') >> type_def << parsy.regex(r'\)\:?')
 )
 
-arg_type = parsy.seq(arg=var_name, type=type_def)  # kwargs needs Py 3.6+
+arg_type = parsy.seq(arg=var_name, type=arg_type_def.optional())  # seq kwargs needs Py 3.6+
 
 rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
 

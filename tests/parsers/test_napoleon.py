@@ -5,9 +5,11 @@ from waterloo.parsers.napoleon import (
     args_parser,
     args_head,
     arg_type,
-    rest_of_line,
     ignored_line,
     p_arg_list,
+    rest_of_line,
+    var_name,
+    type_def,
 )
 
 
@@ -21,6 +23,52 @@ def test_args_head():
     no_newline = """Args:"""
     with pytest.raises(parsy.ParseError):
         args_head.parse(no_newline)
+
+
+@pytest.mark.parametrize('example', [
+    "str",
+    "Dict",
+    "var_1_2_abc",
+    "ClassName",
+])
+def test_var_name_valid(example):
+    result = var_name.parse(example)
+    assert result == example
+
+
+@pytest.mark.parametrize('example', [
+    "dotted.path",
+    "1name",
+    "no-hyphens",
+    "one two three",
+])
+def test_var_name_invalid(example):
+    with pytest.raises(parsy.ParseError):
+        var_name.parse(example)
+
+
+@pytest.mark.parametrize('example,expected', [
+    ("str", "str"),
+    ("Dict", "Dict"),
+    ("Dict[int, str]", ["Dict", ["int", "str"]]),
+    ("Dict[int, db.models.User]", ["Dict", ["int", "db.models.User"]]),
+    ("my.generic.Container[int]", ["my.generic.Container", ["int"]]),
+    ("Tuple[int, ...]", ["Tuple", ["int", "..."]]),
+    ("Callable[[int, str], Dict[int, str]]", ["Callable", [["int", "str"], ["Dict", ["int", "str"]]]]),
+    ("""Tuple[
+            int,
+            str,
+            ClassName
+        ]""", ["Tuple", ["int", "str", "ClassName"]]),
+    ("""Tuple[
+            int,
+            str,
+            ClassName,
+        ]""", ["Tuple", ["int", "str", "ClassName"]]),
+])
+def test_type_def_valid(example, expected):
+    result = type_def.parse(example)
+    assert result == expected
 
 
 @pytest.mark.parametrize('example', [
@@ -79,6 +127,7 @@ def test_p_arg_list():
             retry_interval (Optional[float]): how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
+            **kwargs: passed to inner function
     """
     result = p_arg_list.parse(example)
     head, arg_list = result
@@ -98,7 +147,11 @@ def test_p_arg_list():
         },
         {
             'arg': 'retry_interval',
-            'type': 'Optional[float]',
+            'type': ['Optional', ['float']],
+        },
+        {
+            'arg': '**kwargs',
+            'type': None,
         },
     ]
 
