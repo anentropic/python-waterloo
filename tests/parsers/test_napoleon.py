@@ -2,11 +2,12 @@ import parsy
 import pytest
 
 from waterloo.parsers.napoleon import (
-    args_parser,
     args_head,
     arg_type,
+    docstring_parser,
     ignored_line,
     p_arg_list,
+    p_returns_block,
     rest_of_line,
     var_name,
     type_def,
@@ -127,12 +128,12 @@ def test_p_arg_list():
             retry_interval (Optional[float]): how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
-            **kwargs: passed to inner function
+            *inner_args
+            **inner_kwargs: passed to inner function
     """
-    result = p_arg_list.parse(example)
-    head, arg_list = result
-    assert head == 'Args'
-    assert arg_list == [
+    section = p_arg_list.parse(example)
+    assert section['name'] == 'Args'  # normalised "Kwargs" -> "Args"
+    assert section['items'] == [
         {
             'arg': 'key',
             'type': 'str',
@@ -150,14 +151,31 @@ def test_p_arg_list():
             'type': ['Optional', ['float']],
         },
         {
-            'arg': '**kwargs',
+            'arg': '*inner_args',
+            'type': None,
+        },
+        {
+            'arg': '**inner_kwargs',
             'type': None,
         },
     ]
 
 
-@pytest.mark.skip
-def test_parser():
+def test_p_returns_block():
+    example = """
+        Yields:
+            Optional[float]: how long to wait between polling
+                for tokens to be available. `None` means use default interval
+                which is equal to time needed to replenish `num_tokens`.
+    """
+    section = p_returns_block.parse(example)
+    assert section['name'] == 'Yields'  # either "Returns" or "Yields", distinction preserved
+    assert section['items'] == [
+        ['Optional', ['float']],
+    ]
+
+
+def test_docstring_parser():
     example = """
         Will block thread until `num_tokens` could be consumed from token bucket `key`.
 
@@ -174,12 +192,89 @@ def test_parser():
             bool: whether we got the requested tokens or not
                 (False if timed out)
         """
-    expected_args = {
-        'key': 'str',
-        'num_tokens': 'int',
-        'timeout': 'int',
-        'retry_interval': 'Optional[float]',
+    expected = {
+        'args': {
+            'name': 'Args',
+            'items': [
+                {
+                    'arg': 'key',
+                    'type': 'str',
+                },
+                {
+                    'arg': 'num_tokens',
+                    'type': 'int',
+                },
+                {
+                    'arg': 'timeout',
+                    'type': 'int',
+                },
+                {
+                    'arg': 'retry_interval',
+                    'type': ['Optional', ['float']],
+                },
+            ],
+        },
+        'returns': {
+            'name': 'Returns',
+            'items': [
+                'bool'
+            ],
+        },
     }
 
-    result = args_parser.parse(example)
-    assert result == expected_args
+    result = docstring_parser.parse(example)
+    assert result == expected
+
+
+def test_docstring_parser2():
+    example = """
+        Will block thread until `num_tokens` could be consumed from token bucket `key`.
+
+        Args:
+            key (str): identifying a specific token bucket
+            num_tokens (int): will block without consuming any tokens until
+                this amount are availabe to be consumed
+            timeout (int): seconds to block for
+            retry_interval (Optional[float]): how long to wait between polling
+                for tokens to be available. `None` means use default interval
+                which is equal to time needed to replenish `num_tokens`.
+
+        Returns:
+            Tuple[
+                int,
+                str,
+                ClassName,
+            ]
+        """
+    expected = {
+        'args': {
+            'name': 'Args',
+            'items': [
+                {
+                    'arg': 'key',
+                    'type': 'str',
+                },
+                {
+                    'arg': 'num_tokens',
+                    'type': 'int',
+                },
+                {
+                    'arg': 'timeout',
+                    'type': 'int',
+                },
+                {
+                    'arg': 'retry_interval',
+                    'type': ['Optional', ['float']],
+                },
+            ],
+        },
+        'returns': {
+            'name': 'Returns',
+            'items': [
+                ["Tuple", ["int", "str", "ClassName"]]
+            ],
+        },
+    }
+
+    result = docstring_parser.parse(example)
+    assert result == expected
