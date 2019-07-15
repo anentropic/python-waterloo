@@ -17,6 +17,8 @@ pytest = "*"
 [packages]
 
 megaparsy = {git = "https://github.com/anentropic/megaparsy"}
+bowler = "*"
+termcolor = "*"
 
 
 [requires]
