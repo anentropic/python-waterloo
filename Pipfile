@@ -8,8 +8,8 @@ name = "pypi"
 [dev-packages]
 
 ipython = "*"
-pdbpp = "*"
 ipdb = "*"
+pdbpp = "*"
 twine = "*"
 pytest = "*"
 

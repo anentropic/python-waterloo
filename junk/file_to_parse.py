@@ -72,9 +72,9 @@ def third(product_ids, user_id=None):
     pass
 
 
-def fourth(product_ids, user_id=None):
-    # type: (List[int], Optional[int]) -> Dict[int, List[Dict]]
+def fourth(product_id, user_id):
+    # type: (int, int) -> str
     """
     Already annotated
     """
-    return {'x': 0}
+    return 'whatever'
