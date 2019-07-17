@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-import argparse
 import logging
 import re
-import sys
 from functools import partial
+from typing import List, NamedTuple, Union
 
 from megaparsy import char
 from megaparsy.char.lexer import (
@@ -18,6 +16,18 @@ from megaparsy.control.applicative.combinators import between
 import parsy
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+__all__ = ('docstring_parser',)
+
+
+TypeAtom = NamedTuple(
+    'TypeAtom',
+    (
+        ('name', str),
+        ('args', List[Union[str, 'TypeAtom']]),
+    ),
+)
 
 
 # UTILS
@@ -72,7 +82,7 @@ def _nested():
 _type_token = dotted_var_path | parsy.string('...')
 
 # mypy type definition, parsed into its nested components
-type_def = parsy.seq(_type_token, _nested) | _type_token | _nested
+type_def = parsy.seq(_type_token, _nested).combine(TypeAtom) | _type_token | _nested
 
 # in "Args" section the type def is in parentheses after the var name
 arg_type_def = lexeme(
@@ -177,20 +187,3 @@ docstring_parser = (
     )
     << parsy.regex(r'.*', re.DOTALL)
 )
-
-
-if __name__ == "__main__":
-    cli_arg_parser = argparse.ArgumentParser()
-    cli_arg_parser.add_argument(
-        'file_to_parse',
-        default=sys.stdin,
-        type=argparse.FileType('r'),
-        nargs='?',
-    )
-    cli_args = cli_arg_parser.parse_args()
-
-    input_ = cli_args.file_to_parse.read()
-    # print(input_)
-
-    val = docstring_parser.parse(input_)
-    print(val)

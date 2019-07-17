@@ -51,21 +51,21 @@ def test_var_name_invalid(example):
 @pytest.mark.parametrize('example,expected', [
     ("str", "str"),
     ("Dict", "Dict"),
-    ("Dict[int, str]", ["Dict", ["int", "str"]]),
-    ("Dict[int, db.models.User]", ["Dict", ["int", "db.models.User"]]),
-    ("my.generic.Container[int]", ["my.generic.Container", ["int"]]),
-    ("Tuple[int, ...]", ["Tuple", ["int", "..."]]),
-    ("Callable[[int, str], Dict[int, str]]", ["Callable", [["int", "str"], ["Dict", ["int", "str"]]]]),
+    ("Dict[int, str]", ("Dict", ["int", "str"])),
+    ("Dict[int, db.models.User]", ("Dict", ["int", "db.models.User"])),
+    ("my.generic.Container[int]", ("my.generic.Container", ["int"])),
+    ("Tuple[int, ...]", ("Tuple", ["int", "..."])),
+    ("Callable[[int, str], Dict[int, str]]", ("Callable", [["int", "str"], ("Dict", ["int", "str"])])),
     ("""Tuple[
             int,
             str,
             ClassName
-        ]""", ["Tuple", ["int", "str", "ClassName"]]),
+        ]""", ("Tuple", ["int", "str", "ClassName"])),
     ("""Tuple[
             int,
             str,
             ClassName,
-        ]""", ["Tuple", ["int", "str", "ClassName"]]),
+        ]""", ("Tuple", ["int", "str", "ClassName"])),
 ])
 def test_type_def_valid(example, expected):
     result = type_def.parse(example)
@@ -148,7 +148,7 @@ def test_p_arg_list():
         },
         {
             'arg': 'retry_interval',
-            'type': ['Optional', ['float']],
+            'type': ('Optional', ['float']),
         },
         {
             'arg': '*inner_args',
@@ -171,7 +171,7 @@ def test_p_returns_block():
     section = p_returns_block.parse(example)
     assert section['name'] == 'Yields'  # either "Returns" or "Yields", distinction preserved
     assert section['items'] == [
-        ['Optional', ['float']],
+        ('Optional', ['float']),
     ]
 
 
@@ -210,7 +210,7 @@ def test_docstring_parser():
                 },
                 {
                     'arg': 'retry_interval',
-                    'type': ['Optional', ['float']],
+                    'type': ('Optional', ['float']),
                 },
             ],
         },
@@ -264,14 +264,14 @@ def test_docstring_parser2():
                 },
                 {
                     'arg': 'retry_interval',
-                    'type': ['Optional', ['float']],
+                    'type': ('Optional', ['float']),
                 },
             ],
         },
         'returns': {
             'name': 'Returns',
             'items': [
-                ["Tuple", ["int", "str", "ClassName"]]
+                ("Tuple", ["int", "str", "ClassName"])
             ],
         },
     }
