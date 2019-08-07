@@ -1,3 +1,4 @@
+from hypothesis import given, strategies as st
 import parsy
 import pytest
 
@@ -14,38 +15,99 @@ from waterloo.parsers.napoleon import (
 )
 
 
-def test_args_head():
-    # TODO permutations of leading whitespace and Kwargs etc
-    example = """Args:
-"""
+st_whitespace_char = st.text(' \t', min_size=1, max_size=1)
+
+
+@st.composite
+def st_whitespace(draw):
+    """
+    homogenous whitespace of random type and length (including '')
+    """
+    n = draw(st.integers(min_value=0, max_value=10))
+    ws = draw(st_whitespace_char)
+    return ws * n
+
+
+VALID_ARGS_SECTION_NAMES = {'Args', 'Kwargs'}
+
+st_valid_args_section_name = st.one_of(
+    *(st.just(word) for word in VALID_ARGS_SECTION_NAMES)
+)
+
+st_invalid_args_section_name = st.text().filter(
+    lambda t: t not in VALID_ARGS_SECTION_NAMES
+)
+
+VALID_ARGS_HEAD_TEMPLATE = "{section_name}:{trailing_whitespace}\n"
+
+st_invalid_args_head_template = st.one_of(
+    st.just("{section_name}:{trailing_whitespace}"),
+    st.just("{section_name}{trailing_whitespace}\n"),
+)
+
+
+@st.composite
+def st_valid_args_head(draw):
+    section_name = draw(st_valid_args_section_name)
+    trailing_whitespace = draw(st_whitespace())
+    return VALID_ARGS_HEAD_TEMPLATE.format(
+        section_name=section_name,
+        trailing_whitespace=trailing_whitespace,
+    )
+
+
+@st.composite
+def st_invalid_args_head_bad_name(draw):
+    section_name = draw(st_invalid_args_section_name)
+    trailing_whitespace = draw(st_whitespace())
+    return VALID_ARGS_HEAD_TEMPLATE.format(
+        section_name=section_name,
+        trailing_whitespace=trailing_whitespace,
+    )
+
+
+@st.composite
+def st_invalid_args_head_bad_template(draw):
+    leading_whitespace = draw(st_whitespace())
+    section_name = draw(st_valid_args_section_name)
+    trailing_whitespace = draw(st_whitespace())
+    template = draw(st_invalid_args_head_template)
+    return template.format(
+        leading_whitespace=leading_whitespace,
+        section_name=section_name,
+        trailing_whitespace=trailing_whitespace,
+    )
+
+
+@given(st_valid_args_head())
+def test_valid_args_head(example):
     result = args_head.parse(example)
-    assert result == 'Args'
+    assert result == "Args"  # (Section name has been normalised)
 
-    no_newline = """Args:"""
+
+@given(st.one_of(
+    st_invalid_args_head_bad_name(),
+    st_invalid_args_head_bad_template(),
+))
+def test_invalid_args_head(example):
     with pytest.raises(parsy.ParseError):
-        args_head.parse(no_newline)
+        args_head.parse(example)
 
 
-@pytest.mark.parametrize('example', [
-    "str",
-    "Dict",
-    "var_1_2_abc",
-    "ClassName",
-])
-def test_var_name_valid(example):
-    result = var_name.parse(example)
-    assert result == example
-
-
-@pytest.mark.parametrize('example', [
-    "dotted.path",
-    "1name",
-    "no-hyphens",
-    "one two three",
-])
-def test_var_name_invalid(example):
-    with pytest.raises(parsy.ParseError):
-        var_name.parse(example)
+@given(
+    splat=st.text('*', min_size=0, max_size=4),
+    name=st.text(min_size=0, max_size=10),
+    trailing_ws=st_whitespace(),
+    newline=st.one_of(st.just(''), st.just('\n')),
+)
+def test_var_name(splat, name, trailing_ws, newline):
+    example = f"{splat}{name}{trailing_ws}{newline}"
+    if len(splat) <= 2 and name.isidentifier() and not newline:
+        result = var_name.parse(example)
+        assert result == f"{splat}{name}"
+    else:
+        with pytest.raises(parsy.ParseError):
+            var_name.parse(example)
 
 
 @pytest.mark.parametrize('example,expected', [

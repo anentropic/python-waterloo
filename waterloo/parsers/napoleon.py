@@ -36,10 +36,9 @@ TypeAtom = NamedTuple(
 scn = space(char.space1)
 
 # parser which only matches ' ' and '\t', but *not* newlines
-_space_no_nl = parsy.regex(r'( |\t)*').result('')
-_space1_no_nl = parsy.regex(r'( |\t)+').result('')
+sc = parsy.regex(r'( |\t)*').result('')
+
 _non_space = parsy.regex(r'\S')
-sc = space(_space1_no_nl)
 
 # factory for parser returning tokens separated by no-newline whitespace
 lexeme = partial(megaparsy_lexeme, p_space=sc)
@@ -52,20 +51,20 @@ rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
 # "Kwargs" is not official part of Napoleon but gets used by mistake
 args_section_name = parsy.regex('Args|Kwargs').result('Args')
 
-args_head = args_section_name << parsy.string(':') << (_space_no_nl + char.eol)
+args_head = args_section_name << parsy.string(':') << (sc + char.eol)
 
 returns_section_name = parsy.regex('Returns|Yields')
 
-returns_head = returns_section_name << parsy.string(':') << (_space_no_nl + char.eol)
+returns_head = returns_section_name << parsy.string(':') << (sc + char.eol)
 
 
 # PYTHON IDENTIFIERS
 
 # a python var name
-var_name = lexeme(parsy.regex(r'\*{0,2}[a-zA-Z]\w*'))
+var_name = lexeme(parsy.regex(r'\*{0,2}[^\W0-9]\w*'))
 
-# a dotted import path to a var name
-dotted_var_path = lexeme(parsy.regex(r'[a-zA-Z][\w\.]*'))
+# a dotted import module path to a python var name
+dotted_var_path = lexeme(parsy.regex(r'[^\W0-9][\w\.]*'))
 
 
 @parsy.generate
@@ -144,7 +143,7 @@ def section(p_section_name, p_arg_items):
 
     @parsy.generate
     def _args_list_block():
-        head = yield p_section_name << parsy.string(':') << _space_no_nl
+        head = yield p_section_name << parsy.string(':') << sc
         return IndentSome(
             indent=None,
             f=lambda tail: {'name': head, 'items': tail},
@@ -173,7 +172,7 @@ p_returns_block = indent_block(
 
 # consume any line that is not a section head that we care about (Args / Returns)
 ignored_line = (
-    (_space_no_nl >> (args_head | returns_head)).should_fail('not section head') >>
+    (sc >> (args_head | returns_head)).should_fail('not section head') >>
     rest_of_line >>
     char.eol
 ).result('')

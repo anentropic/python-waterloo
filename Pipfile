@@ -1,26 +1,20 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [dev-packages]
-
 ipython = "*"
 ipdb = "*"
 pdbpp = "*"
 twine = "*"
 pytest = "*"
-
+hypothesis = "*"
 
 [packages]
-
 megaparsy = {git = "https://github.com/anentropic/megaparsy"}
 bowler = "*"
 termcolor = "*"
 
-
 [requires]
-
 python_version = "3.7"

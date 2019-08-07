@@ -2,6 +2,10 @@ import re
 from tokenize import tokenize, INDENT
 
 from bowler import Query, LN, Capture, Filename
+import parsy
+
+from waterloo.parsers.napoleon import docstring_parser
+from waterloo.utils import mypy_py2_annotation
 
 
 IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
@@ -49,9 +53,10 @@ def annotate_py2(node: LN, capture: Capture, filename: Filename) -> LN:
     Adds mypy type annotation comments for Python 2 code
     """
     inital_indent = capture['initial_indent_node'][0]
-    inital_indent.prefix = "{}# waterloo!\n".format(
-        inital_indent.value
-    )
+    print(capture['docstring'])
+    # TODO: does not handle missing Returns: clause
+    docstring_types = docstring_parser.parse(capture['docstring'])
+    inital_indent.prefix = mypy_py2_annotation(docstring_types)
     return node
 
 
