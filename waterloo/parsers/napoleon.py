@@ -1,7 +1,6 @@
 import logging
 import re
 from functools import partial
-from typing import List, NamedTuple, Union
 
 from megaparsy import char
 from megaparsy.char.lexer import (
@@ -15,19 +14,13 @@ from megaparsy.char.lexer import (
 from megaparsy.control.applicative.combinators import between
 import parsy
 
+from waterloo.types import TypeAtom
+
+
 logging.basicConfig(level=logging.DEBUG)
 
 
 __all__ = ('docstring_parser',)
-
-
-TypeAtom = NamedTuple(
-    'TypeAtom',
-    (
-        ('name', str),
-        ('args', List[Union[str, 'TypeAtom']]),
-    ),
-)
 
 
 # UTILS
@@ -61,10 +54,27 @@ returns_head = returns_section_name << parsy.string(':') << (sc + char.eol)
 # PYTHON IDENTIFIERS
 
 # a python var name
-var_name = lexeme(parsy.regex(r'\*{0,2}[^\W0-9]\w*'))
+# (approximate support for Py3 unicode identifiers PEP-3131, see
+# https://stackoverflow.com/questions/49100678/regex-matching-unicode-variable-names
+# ...the regex is a bit too lenient accepting some chars that python doesn't)
+@parsy.generate
+def python_identifier():
+    name = yield parsy.regex(r'[^\W0-9][\w]*')
+    if name.isidentifier():
+        return name
+    else:
+        yield parsy.fail("Not a valid python identifier")
+
+
+var_name = lexeme(
+    parsy.regex(r'\*{0,2}') +
+    python_identifier
+)
 
 # a dotted import module path to a python var name
-dotted_var_path = lexeme(parsy.regex(r'[^\W0-9][\w\.]*'))
+dotted_var_path = lexeme(
+    python_identifier.sep_by(parsy.string('.'), min=1).combine(lambda *names: '.'.join(names))
+)
 
 
 @parsy.generate

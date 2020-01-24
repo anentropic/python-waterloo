@@ -1,4 +1,6 @@
-from hypothesis import given, strategies as st
+import re
+
+from hypothesis import assume, given, strategies as st
 import parsy
 import pytest
 
@@ -6,6 +8,7 @@ from waterloo.parsers.napoleon import (
     args_head,
     arg_type,
     docstring_parser,
+    dotted_var_path,
     ignored_line,
     p_arg_list,
     p_returns_block,
@@ -13,6 +16,7 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_def,
 )
+from waterloo.types import TypeAtom
 
 
 st_whitespace_char = st.text(' \t', min_size=1, max_size=1)
@@ -21,11 +25,29 @@ st_whitespace_char = st.text(' \t', min_size=1, max_size=1)
 @st.composite
 def st_whitespace(draw):
     """
-    homogenous whitespace of random type and length (including '')
+    homogenous whitespace of random type (space or tab) and random length
+    (including zero, i.e. '')
     """
     n = draw(st.integers(min_value=0, max_value=10))
     ws = draw(st_whitespace_char)
     return ws * n
+
+
+@st.composite
+def st_non_whitespace(draw, *args, **kwargs):
+    """
+    Drawn from (by default) the full range of Hypothesis' `text` strategy
+    but eliminating whitespace chars (including \n)
+    """
+    val = draw(st.text(*args, **kwargs))
+    assume(val.strip() == val)
+    return val
+
+
+st_optional_newline = st.one_of(
+    st.just(''),
+    st.just('\n'),
+)
 
 
 VALID_ARGS_SECTION_NAMES = {'Args', 'Kwargs'}
@@ -96,11 +118,17 @@ def test_invalid_args_head(example):
 
 @given(
     splat=st.text('*', min_size=0, max_size=4),
-    name=st.text(min_size=0, max_size=10),
+    name=st_non_whitespace(min_size=0, max_size=10),
     trailing_ws=st_whitespace(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
 def test_var_name(splat, name, trailing_ws, newline):
+    """
+    A var name begins with 0, 1 or 2 'splat' chars ("*")
+    followed by a python var identifier
+    optionally followed by non-newline whitespace
+    not followed by a newline
+    """
     example = f"{splat}{name}{trailing_ws}{newline}"
     if len(splat) <= 2 and name.isidentifier() and not newline:
         result = var_name.parse(example)
@@ -110,32 +138,168 @@ def test_var_name(splat, name, trailing_ws, newline):
             var_name.parse(example)
 
 
-@pytest.mark.parametrize('example,expected', [
-    ("str", "str"),
-    ("Dict", "Dict"),
-    ("Dict[int, str]", ("Dict", ["int", "str"])),
-    ("Dict[int, db.models.User]", ("Dict", ["int", "db.models.User"])),
-    ("my.generic.Container[int]", ("my.generic.Container", ["int"])),
-    ("Tuple[int, ...]", ("Tuple", ["int", "..."])),
-    ("Callable[[int, str], Dict[int, str]]", ("Callable", [["int", "str"], ("Dict", ["int", "str"])])),
-    ("""Tuple[
-            int,
-            str,
-            ClassName
-        ]""", ("Tuple", ["int", "str", "ClassName"])),
-    ("""Tuple[
-            int,
-            str,
-            ClassName,
-        ]""", ("Tuple", ["int", "str", "ClassName"])),
-])
-def test_type_def_valid(example, expected):
+@given(
+    segments=st.lists(st.text(min_size=0, max_size=10), min_size=1),
+    trailing_ws=st_whitespace(),
+    newline=st.one_of(st.just(''), st.just('\n')),
+)
+def test_dotted_var_path(segments, trailing_ws, newline):
+    """
+    A dotted var path is a '.'-separated list of python identifiers
+    optionally followed by non-newline whitespace
+    not followed by a newline
+    """
+    path = '.'.join(segments)
+    example = f"{path}{trailing_ws}{newline}"
+    if all(seg.isidentifier() for seg in segments) and not newline:
+        result = dotted_var_path.parse(example)
+        assert result == path
+    else:
+        with pytest.raises(parsy.ParseError):
+            dotted_var_path.parse(example)
+
+
+st_python_identifier = (
+    st.from_regex(r'[^\W0-9][\w]*', fullmatch=True).filter(lambda s: s.isidentifier())
+)
+
+
+@st.composite
+def st_dotted_var_path(draw):
+    segments = draw(st.lists(st_python_identifier, min_size=1))
+    return '.'.join(segments)
+
+
+@st.composite
+def st_noargs_typevar(draw):
+    return TypeAtom(
+        name=draw(st_dotted_var_path()),
+        args=(),
+    )
+
+
+@st.composite
+def st_generic_typevar(draw, st_children):
+    """
+    A type var with params (i.e. is 'generic'), without being one of the
+    special cases such as homogenous tuple, callable (others?)
+
+    Args:
+        draw: provided by @st.composite
+        st_children: another hypothesis strategy to draw from
+            (first arg to function returned by decorator)
+    """
+    return TypeAtom(
+        name=draw(st_dotted_var_path()),
+        args=draw(st.lists(st_children))
+    )
+
+
+@st.composite
+def st_homogenous_tuple_typevar(draw, st_children):
+    return TypeAtom(
+        name='Tuple',
+        args=(draw(st_children), '...')
+    )
+
+
+@st.composite
+def st_callable_typevar(draw, st_children):
+    args_param = draw(st.lists(st_children, min_size=1))
+    returns_param = draw(st_children)
+    return TypeAtom(
+        name='Callable',
+        args=(args_param, returns_param)
+    )
+
+
+@st.composite
+def st_type_atom(draw):
+    example = draw(
+        st.recursive(
+            st_noargs_typevar(),
+            lambda st_children: st.one_of(
+                st_children,
+                st_generic_typevar(st_children),
+                st_homogenous_tuple_typevar(st_children),
+                st_callable_typevar(st_children),
+            ),
+            max_leaves=5,
+        )
+    )
+    return example
+
+
+def _add_arbitrary_whitespace(segment, whitespace, newline):
+    """
+    Adds arbitrary whitespace and optional newlines
+    """
+    if segment.startswith('['):
+        return f'{segment}{newline}{whitespace}'
+    elif segment.startswith(','):
+        return f'{segment}{newline}{whitespace}'
+    elif segment.startswith(']'):
+        return f'{newline}{whitespace}{segment}'
+    else:
+        return segment
+
+
+@st.composite
+def st_napoleon_type_annotation(draw):
+    """
+    Generate a type annotation that you might find in a napoleon docstring
+    made from a valid TypeAtom but with arbitrary whitespace in valid locations
+
+    - after a `[`
+    - after a `,`
+    - before a `]`
+    """
+    type_atom = draw(st_type_atom())
+    annotation = type_atom.to_annotation()
+    return ''.join(
+        _add_arbitrary_whitespace(
+            segment=segment.strip(),
+            whitespace=draw(st_whitespace()),
+            newline=draw(st_optional_newline),
+        )
+        for segment in re.split(r'([\[\]\,])', annotation)
+    )
+
+
+def _add_normalised_whitespace(segment):
+    if segment.startswith(','):
+        return f'{segment} '
+    else:
+        return segment
+
+
+def _normalise_annotation(annotation):
+    """
+    Take a dirty annotation and strip spurious newlines and whitespace so that
+    it should match the output from an equivalent TypeAtom.to_annotation()
+    """
+    return ''.join(
+        _add_normalised_whitespace(segment.strip())
+        for segment in re.split(r'([\[\]\,])', annotation)
+    )
+
+
+@given(st_napoleon_type_annotation())
+def test_type_def(example):
+    """
+    Generate an arbitrary type annotation and check that we can round-trip
+    compare it with the parsed result.
+    """
     result = type_def.parse(example)
-    assert result == expected
+    normalised = _normalise_annotation(example)
+    if isinstance(result, TypeAtom):
+        result = result.to_annotation()
+    assert normalised == result
 
 
 @pytest.mark.parametrize('example', [
     "key (str): identifying a specific token bucket",
+    "key (str): identifying a specific blah blah looks like (type):",
     "key (str): ",
     "key (str):",
     "key (str)",

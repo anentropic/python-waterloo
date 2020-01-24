@@ -2,7 +2,6 @@ import re
 from tokenize import tokenize, INDENT
 
 from bowler import Query, LN, Capture, Filename
-import parsy
 
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.utils import mypy_py2_annotation
