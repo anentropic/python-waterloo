@@ -26,6 +26,14 @@ def type_atom_to_str(type_atom):
 
 
 def mypy_py2_annotation(types_dict):
+    """
+    Args:
+        types_dict: as per the result of `docstring_parser` containing
+            details of the arg types and return type
+
+    Returns:
+        str: a mypy py2 type comment for a function
+    """
     args = _join_type_atoms(
         map(_type_getter, types_dict['args']['items'])
     )
