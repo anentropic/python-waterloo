@@ -1,6 +1,24 @@
 from typing import Iterable, NamedTuple, Union
 
 
+# https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections
+VALID_ARGS_SECTION_NAMES = {
+    'Args',
+    'Kwargs',  # not an official part of Napoleon spec but frequently used
+    'Arguments',
+    'Keyword Args',
+    'Keyword Arguments',
+    'Parameters',
+}
+
+VALID_RETURNS_SECTION_NAMES = {
+    'Return': (r'Return(?!s)', 'Returns'),
+    'Returns': (r'Returns', 'Returns'),
+    'Yield': (r'Yield(?!s)', 'Yields'),
+    'Yields': (r'Yields', 'Yields'),
+}
+
+
 def _repr_type_arg(arg):
     if isinstance(arg, str):
         return arg

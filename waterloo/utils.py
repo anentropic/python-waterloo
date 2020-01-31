@@ -12,6 +12,7 @@ def _join_type_atoms(type_atoms):
 
 
 def type_atom_to_str(type_atom):
+    # TODO: superseded by TypeAtom.to_annotation()
     if isinstance(type_atom, str):
         return type_atom
     elif isinstance(type_atom, list):

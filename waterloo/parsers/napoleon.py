@@ -14,7 +14,7 @@ from megaparsy.char.lexer import (
 from megaparsy.control.applicative.combinators import between
 import parsy
 
-from waterloo.types import TypeAtom
+from waterloo.types import TypeAtom, VALID_ARGS_SECTION_NAMES, VALID_RETURNS_SECTION_NAMES
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -41,12 +41,23 @@ rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
 
 # SECTION HEADERS
 
-# "Kwargs" is not official part of Napoleon but gets used by mistake
-args_section_name = parsy.regex('Args|Kwargs').result('Args')
+args_section_name = (
+    parsy
+    .regex(r'|'.join(VALID_ARGS_SECTION_NAMES))
+    .result('Args')  # normalise name
+)
 
 args_head = args_section_name << parsy.string(':') << (sc + char.eol)
 
-returns_section_name = parsy.regex('Returns|Yields')
+returns_section_name = (
+    parsy
+    .regex(
+        r'|'.join(
+            pattern for pattern, _ in VALID_RETURNS_SECTION_NAMES.values()
+        )
+    )
+    .map(lambda name: VALID_RETURNS_SECTION_NAMES[name][1])  # normalise name
+)
 
 returns_head = returns_section_name << parsy.string(':') << (sc + char.eol)
 
@@ -191,8 +202,8 @@ ignored_line = (
 # THE PARSER
 docstring_parser = (
     parsy.seq(
-        args=ignored_line.many() >> p_arg_list,
-        returns=ignored_line.many() >> p_returns_block,
+        args=(ignored_line.many() >> p_arg_list).optional(),
+        returns=(ignored_line.many() >> p_returns_block).optional(),
     )
     << parsy.regex(r'.*', re.DOTALL)
 )

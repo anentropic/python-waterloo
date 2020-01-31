@@ -100,4 +100,8 @@ def annotate_file(filename: str, max_indent=8, **execute_kwargs):
         .filter(not_already_annotated_py2)
         .modify(annotate_py2)
     )
+    # TODO: remove types from docstring a la:
+    # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#type-annotations
+    # sphinx can still render types in docs in this case thanks to:
+    # https://pypi.org/project/sphinx-autodoc-typehints/#using-type-hint-comments
     q.execute(**execute_kwargs)
