@@ -13,9 +13,9 @@ hypothesis = "*"
 
 [packages]
 megaparsy = {git = "https://github.com/anentropic/megaparsy"}
-bowler = "*"
 termcolor = "*"
 mypy = "*"
+bowler = "*"
 
 [requires]
 python_version = "3.7"

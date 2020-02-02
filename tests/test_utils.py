@@ -10,7 +10,7 @@ from waterloo.types import (
     TypeAtom,
     TypeSignature,
 )
-from waterloo.utils import mypy_py2_annotation
+from waterloo.utils import get_type_comment
 
 
 @pytest.mark.parametrize('example,expected', [
@@ -57,6 +57,6 @@ from waterloo.utils import mypy_py2_annotation
         "# type: (str, int, int, Optional[float]) -> Tuple[int, str, ClassName]"
     )
 ])
-def test_mypy_py2_annotation(example, expected):
-    val = mypy_py2_annotation(example)
+def test_get_type_comment(example, expected):
+    val = get_type_comment(example)
     assert val == expected

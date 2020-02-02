@@ -36,7 +36,7 @@ def main():
     )
 
     parser.add_argument(
-        '--max-indent-level', type=int, default=8,
+        '--max-indent-level', type=int, default=10,
         help='we have to generate pattern-matching indents in order to '
         'annotate nested functions, this is how many indent levels to '
         'generate matches for (indents larger than this will not be '

@@ -1,7 +1,28 @@
+import typing
 from operator import itemgetter
 from typing import cast, Iterable
 
 from waterloo.types import TypeAtom, TypeSignature
+
+
+BUILTIN_TYPE_NAMES = {
+    name
+    for name in __builtins__.keys()
+    if not name.startswith('__') and isinstance(eval(name), type)
+}
+
+TYPING_TYPE_NAMES = {
+    name
+    for name in dir(typing)
+    if isinstance(
+        getattr(typing, name),
+        (
+            typing._GenericAlias,  # type: ignore[attr-defined,arg-type]
+            typing._SpecialForm,
+            typing.TypeVar,
+        )
+    )
+}
 
 
 _type_getter = itemgetter('type')
@@ -11,7 +32,7 @@ def _join_type_atoms(type_atoms: Iterable[TypeAtom]) -> str:
     return ', '.join(atom.to_annotation() for atom in type_atoms)
 
 
-def mypy_py2_annotation(signature: TypeSignature) -> str:
+def get_type_comment(signature: TypeSignature) -> str:
     """
     Args:
         signature: as per the result of `docstring_parser` containing
@@ -38,3 +59,11 @@ def mypy_py2_annotation(signature: TypeSignature) -> str:
         # this is a reasonable default but it should be a configurable error
         returns = 'None'
     return f'# type: ({args}) -> {returns}'
+
+
+def _is_builtin_type(name: str):
+    return name in BUILTIN_TYPE_NAMES
+
+
+def _is_typing_type(name: str):
+    return name in TYPING_TYPE_NAMES
