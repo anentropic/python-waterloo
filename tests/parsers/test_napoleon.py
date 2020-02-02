@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import parsy
 import pytest
 
@@ -12,7 +14,14 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_atom,
 )
-from waterloo.types import TypeAtom
+from waterloo.types import (
+    ArgsSection,
+    ArgTypes,
+    ReturnsSection,
+    ReturnType,
+    TypeAtom,
+    TypeSignature,
+)
 
 """
 Manually-constructed test-cases for the parsers
@@ -26,7 +35,7 @@ def test_args_head():
     example = """Args:
 """
     result = args_head.parse(example)
-    assert result == 'Args'
+    assert result == ArgsSection.ARGS
 
     no_newline = """Args:"""
     with pytest.raises(parsy.ParseError):
@@ -172,54 +181,34 @@ def test_p_arg_list():
             **inner_kwargs: passed to inner function
     """
     section = p_arg_list.parse(example)
-    assert section['name'] == 'Args'  # normalised "Kwargs" -> "Args"
-    assert section['items'] == [
-        {
-            'arg': 'key',
-            'type': TypeAtom('str', []),
-        },
-        {
-            'arg': 'num_tokens',
-            'type': TypeAtom('int', []),
-        },
-        {
-            'arg': 'timeout',
-            'type': TypeAtom('int', []),
-        },
-        {
-            'arg': 'retry_interval',
-            'type': TypeAtom('Optional', [TypeAtom('float', [])]),
-        },
-        {
-            'arg': '*inner_args',
-            'type': None,
-        },
-        {
-            'arg': '**inner_kwargs',
-            'type': None,
-        },
-    ]
+    assert section.name == ArgsSection.ARGS  # normalised -> "Args" (Enum)
+    assert section.args == OrderedDict([
+        ('key', TypeAtom('str', [])),
+        ('num_tokens', TypeAtom('int', [])),
+        ('timeout', TypeAtom('int', [])),
+        ('retry_interval', TypeAtom('Optional', [TypeAtom('float', [])])),
+        ('*inner_args', None),
+        ('**inner_kwargs', None),
+    ])
 
 
 def test_p_returns_block():
     example = """
-        Yields:
+        Yield:
             Optional[float]: how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
     """
     section = p_returns_block.parse(example)
-    assert section['name'] == 'Yields'  # either "Returns" or "Yields", distinction preserved
-    assert section['items'] == [
-        TypeAtom('Optional', [TypeAtom('float', [])]),
-    ]
+    assert section.name == ReturnsSection.YIELDS  # normalised -> "Returns" (Enum)
+    assert section.type == TypeAtom('Optional', [TypeAtom('float', [])])
 
 
 def test_docstring_parser():
     example = """
         Will block thread until `num_tokens` could be consumed from token bucket `key`.
 
-        Args:
+        Keyword Arguments:
             key (str): identifying a specific token bucket
             num_tokens (int): will block without consuming any tokens until
                 this amount are availabe to be consumed
@@ -232,35 +221,22 @@ def test_docstring_parser():
             bool: whether we got the requested tokens or not
                 (False if timed out)
         """
-    expected = {
-        'args': {
-            'name': 'Args',
-            'items': [
-                {
-                    'arg': 'key',
-                    'type': TypeAtom('str', []),
-                },
-                {
-                    'arg': 'num_tokens',
-                    'type': TypeAtom('int', []),
-                },
-                {
-                    'arg': 'timeout',
-                    'type': TypeAtom('int', []),
-                },
-                {
-                    'arg': 'retry_interval',
-                    'type': TypeAtom('Optional', [TypeAtom('float', [])]),
-                },
-            ],
-        },
-        'returns': {
-            'name': 'Returns',
-            'items': [
-                TypeAtom('bool', [])
-            ],
-        },
-    }
+    expected = TypeSignature(
+        args=ArgTypes(
+            name=ArgsSection.ARGS,
+            args=OrderedDict([
+                ('key', TypeAtom('str', [])),
+                ('num_tokens', TypeAtom('int', [])),
+                ('timeout', TypeAtom('int', [])),
+                ('retry_interval',
+                 TypeAtom('Optional', [TypeAtom('float', [])])),
+            ])
+        ),
+        returns=ReturnType(
+            name=ReturnsSection.RETURNS,
+            type=TypeAtom('bool', []),
+        )
+    )
 
     result = docstring_parser.parse(example)
     assert result == expected
@@ -286,39 +262,26 @@ def test_docstring_parser2():
                 ClassName,
             ]
         """
-    expected = {
-        'args': {
-            'name': 'Args',
-            'items': [
-                {
-                    'arg': 'key',
-                    'type': TypeAtom('str', []),
-                },
-                {
-                    'arg': 'num_tokens',
-                    'type': TypeAtom('int', []),
-                },
-                {
-                    'arg': 'timeout',
-                    'type': TypeAtom('int', []),
-                },
-                {
-                    'arg': 'retry_interval',
-                    'type': TypeAtom('Optional', [TypeAtom('float', [])]),
-                },
-            ],
-        },
-        'returns': {
-            'name': 'Returns',
-            'items': [
-                TypeAtom("Tuple", [
-                    TypeAtom("int", []),
-                    TypeAtom("str", []),
-                    TypeAtom("ClassName", [])
-                ])
-            ],
-        },
-    }
+    expected = TypeSignature(
+        args=ArgTypes(
+            name=ArgsSection.ARGS,
+            args=OrderedDict([
+                ('key', TypeAtom('str', [])),
+                ('num_tokens', TypeAtom('int', [])),
+                ('timeout', TypeAtom('int', [])),
+                ('retry_interval',
+                 TypeAtom('Optional', [TypeAtom('float', [])])),
+            ])
+        ),
+        returns=ReturnType(
+            name=ReturnsSection.RETURNS,
+            type=TypeAtom("Tuple", [
+                TypeAtom("int", []),
+                TypeAtom("str", []),
+                TypeAtom("ClassName", [])
+            ]),
+        )
+    )
 
     result = docstring_parser.parse(example)
     assert result == expected

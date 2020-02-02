@@ -58,13 +58,16 @@ def annotate_py2(node: LN, capture: Capture, filename: Filename) -> LN:
     return node
 
 
-def _detect_indent(filename: str, default='    '):
+def _detect_indent(filename: str, default: str = '    ') -> str:
     """
     This will take the first indent found in the file and use that as the
     model. In Python it is valid to have a different indentation style in
     every indented block in a file. But if you have code like that you don't
     deserve to have nice things! (so waterloo won't match and annotate any
     functions which have different indent styles from the initial one)
+
+    Returns:
+        string containing the detected indent for the file
     """
     with open('junk/file_to_parse.py', 'rb') as f:
         for token_info in tokenize(f.readline):
@@ -77,7 +80,7 @@ def _detect_indent(filename: str, default='    '):
             return default
 
 
-def annotate_file(filename: str, max_indent=8, **execute_kwargs):
+def annotate_file(filename: str, max_indent: int = 8, **execute_kwargs):
     indent = _detect_indent(filename)
     indent_patterns = "|".join(
         "'%s'" % (indent * i) for i in range(1, max_indent + 1)

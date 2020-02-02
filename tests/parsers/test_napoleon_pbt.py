@@ -1,11 +1,11 @@
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
 from functools import partial
 
 import parsy
 import pytest
 from hypothesis import assume, given, note, strategies as st
-from typing import Any, Dict, NamedTuple, Union
+from typing import Any, Dict, NamedTuple
 
 from waterloo.parsers.napoleon import (
     args_head,
@@ -21,6 +21,7 @@ from waterloo.parsers.napoleon import (
     type_atom,
 )
 from waterloo.types import (
+    ArgsSection,
     TypeAtom,
     VALID_ARGS_SECTION_NAMES,
     VALID_RETURNS_SECTION_NAMES,
@@ -223,7 +224,7 @@ def test_arg_name(splat, name, trailing_ws, newline):
 
 
 @given(
-    segments=st_small_lists_nonempty(st.text(min_size=0, max_size=10)),
+    segments=st_small_lists_nonempty(st.text(min_size=0, max_size=8)),
     trailing_ws=st_whitespace(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
@@ -233,6 +234,12 @@ def test_dotted_var_path(segments, trailing_ws, newline):
     optionally followed by non-newline whitespace
     not followed by a newline
     """
+    # because `dotted_var_path` is built on megaparsy.lexeme it will strip
+    # trailing whitespace, and in our test we are explicitly adding trailing
+    # whitespace, so strip it from last segment if present
+    if segments:
+        segments[-1] = segments[-1].rstrip()
+
     path = '.'.join(segments)
     example = f"{path}{trailing_ws}{newline}"
     if all(seg.isidentifier() for seg in segments) and not newline:
@@ -575,19 +582,18 @@ def st_args_section(draw, initial_indent=None):
 
 
 def _validate_args_section(result, context):
-    assert result['name'] == 'Args'  # normalised "<any>" -> "Args"
+    # normalised "<any valid>" -> "Args" (Enum)
+    assert result.name == ArgsSection.ARGS
 
-    expected_arg_type_map: Dict[str, str] = {
-        ex_arg.context['arg_name']: ex_arg.context['type_annotation']
+    expected_arg_type_map = OrderedDict(
+        (ex_arg.context['arg_name'], ex_arg.context['type_annotation'])
         for ex_arg in context['annotated_args']
-    }
-    for result_item in result['items']:
-        assert result_item['arg'] in expected_arg_type_map
+    )
+    assert expected_arg_type_map.keys() == result.args.keys()
 
-        example = expected_arg_type_map.pop(result_item['arg'])
-        assert_annotation_roundtrip(example, result_item['type'])
-
-    assert not expected_arg_type_map
+    for name, result_type in result.args.items():
+        example = expected_arg_type_map[name]
+        assert_annotation_roundtrip(example, result_type)
 
 
 @given(st_args_section())
@@ -662,12 +668,11 @@ def st_returns_section(draw, initial_indent=None):
 
 
 def _validate_returns_section(result, context):
-    assert result['name'] in VALID_RETURNS_SECTION_NAMES
-    assert result['name'] == VALID_RETURNS_SECTION_NAMES[result['name']][1]
+    assert result.name in VALID_RETURNS_SECTION_NAMES
+    assert result.name == VALID_RETURNS_SECTION_NAMES[result.name][1]
 
     example = context['annotated_return'].context['type_annotation']
-    result_type = result['items'][0]
-    assert_annotation_roundtrip(example, result_type)
+    assert_annotation_roundtrip(example, result.type)
 
 
 @given(st_returns_section())
@@ -693,7 +698,11 @@ def st_napoleon_docstring(draw):
             st.just(Example('', {}))
         )
     )
-    gap_2 = draw(st.text('\n', min_size=0, max_size=2)) if args_section[0] else ''
+    gap_2 = (
+        draw(st.text('\n', min_size=0, max_size=2))
+        if args_section[0]
+        else ''
+    )
 
     returns_section = draw(
         st.one_of(
@@ -701,7 +710,11 @@ def st_napoleon_docstring(draw):
             st.just(Example('', {}))
         )
     )
-    gap_3 = draw(st.text('\n', min_size=0, max_size=2)) if returns_section[0] else ''
+    gap_3 = (
+        draw(st.text('\n', min_size=0, max_size=2))
+        if returns_section[0]
+        else ''
+    )
 
     following = "\n".join(
         draw(st_small_lists(st_ignored_line))
@@ -734,13 +747,13 @@ def test_docstring_parser(docstring):
     if context['args_section'][0]:
         note(f"args_section: {context['args_section'][0]}")
         _validate_args_section(
-            result['args'],
+            result.args,
             context['args_section'].context,
         )
 
     if context['returns_section'][0]:
         note(f"returns_section: {context['returns_section'][0]}")
         _validate_returns_section(
-            result['returns'],
+            result.returns,
             context['returns_section'].context,
         )

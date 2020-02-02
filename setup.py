@@ -59,4 +59,10 @@ setup(
         'waterloo',
         'waterloo.parsers',
     ],
+
+    # https://mypy.readthedocs.io/en/latest/installed_packages.html#making-pep-561-compatible-packages
+    package_data={
+        'waterloo': ['py.typed'],
+    },
+    # zip_safe=False,
 )

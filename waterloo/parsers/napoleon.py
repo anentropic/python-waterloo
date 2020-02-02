@@ -1,5 +1,6 @@
-import logging
+# import logging
 import re
+from collections import OrderedDict
 from functools import partial
 
 from megaparsy import char
@@ -15,16 +16,20 @@ from megaparsy.control.applicative.combinators import between
 import parsy
 
 from waterloo.types import (
+    ArgsSection,
+    ArgTypes,
+    ReturnType,
     TypeAtom,
+    TypeSignature,
     VALID_ARGS_SECTION_NAMES,
     VALID_RETURNS_SECTION_NAMES,
 )
 
 
-logging.basicConfig(level=logging.DEBUG)
-
-
 __all__ = ('docstring_parser',)
+
+
+# logging.basicConfig(level=logging.DEBUG)
 
 
 # UTILS
@@ -48,7 +53,7 @@ rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
 args_section_name = (
     parsy
     .regex(r'|'.join(VALID_ARGS_SECTION_NAMES))
-    .result('Args')  # normalise name
+    .result(ArgsSection.ARGS)  # normalise name
 )
 
 args_head = args_section_name << parsy.string(':') << (sc + char.eol)
@@ -73,7 +78,7 @@ returns_head = returns_section_name << parsy.string(':') << (sc + char.eol)
 # https://stackoverflow.com/questions/49100678/regex-matching-unicode-variable-names
 # ...the regex is a bit too lenient accepting some chars that python doesn't)
 @parsy.generate
-def python_identifier():
+def python_identifier() -> parsy.Parser:
     name = yield parsy.regex(r'[^\W0-9][\w]*')
     if name.isidentifier():
         return name
@@ -95,7 +100,7 @@ dotted_var_path = lexeme(
 
 
 @parsy.generate
-def _nested():
+def _nested() -> parsy.Parser:
     """
     Recursion helper for `type_atom`
     """
@@ -133,7 +138,7 @@ return_type = type_atom << parsy.regex(r'\:?')
 
 # SECTION PARSERS
 
-def _line_fold_callback(sc_):
+def _line_fold_callback(sc_: parsy.Parser) -> parsy.Parser:
     """
     A 'line fold' is a follow-on line which is part of an indented item
     (See `line_fold` from megaparsy)
@@ -143,7 +148,7 @@ def _line_fold_callback(sc_):
             to handle indentation
     """
     @parsy.generate
-    def _line_fold_callback_inner():
+    def _line_fold_callback_inner() -> parsy.Parser:
         """
         folded lines are the wrapped description for an arg
         """
@@ -157,13 +162,13 @@ def _line_fold_callback(sc_):
 p_line_fold = line_fold(scn, _line_fold_callback)
 
 
-def indented_items(p_arg_item):
+def indented_items(p_arg_item: parsy.Parser) -> parsy.Parser:
     """
     Factory returning parser to consume the items within a section
     """
 
     @parsy.generate
-    def _indented_items():
+    def _indented_items() -> IndentMany:
         head = yield p_arg_item
         # in this case the `head` is the part of the item we care about
         # and `tail` is be the folded arg description, we discard it
@@ -172,13 +177,16 @@ def indented_items(p_arg_item):
     return _indented_items
 
 
-def section(p_section_name, p_arg_items):
+def section(
+    p_section_name: parsy.Parser,
+    p_arg_items: parsy.Parser,
+) -> parsy.Parser:
     """
     Factory returning parser to consume a section and its indented items
     """
 
     @parsy.generate
-    def _args_list_block():
+    def _args_list_block() -> IndentSome:
         head = yield p_section_name << parsy.string(':') << sc
         return IndentSome(
             indent=None,
@@ -195,6 +203,14 @@ p_arg_list = indent_block(
         args_section_name,
         indent_block(scn, indented_items(arg_type << rest_of_line))
     )
+).map(
+    lambda section: ArgTypes(
+        name=section['name'],
+        args=OrderedDict(
+            (item['arg'], item['type'])
+            for item in section['items']
+        )
+    )
 )
 
 p_returns_block = indent_block(
@@ -202,6 +218,11 @@ p_returns_block = indent_block(
     section(
         returns_section_name,
         indent_block(scn, indented_items(return_type << rest_of_line))
+    )
+).map(
+    lambda section: ReturnType(
+        name=section['name'],
+        type=section['items'][0] if section['items'] else None
     )
 )
 
@@ -215,10 +236,12 @@ ignored_line = (
 
 
 # THE PARSER
-docstring_parser = (
+docstring_parser: parsy.Parser = (
     parsy.seq(
         args=(ignored_line.many() >> p_arg_list).optional(),
         returns=(ignored_line.many() >> p_returns_block).optional(),
+    ).combine_dict(
+        TypeSignature
     )
     << parsy.regex(r'.*', re.DOTALL)
 )
