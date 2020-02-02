@@ -52,8 +52,7 @@ def annotate_py2(node: LN, capture: Capture, filename: Filename) -> LN:
     Adds mypy type annotation comments for Python 2 code
     """
     inital_indent = capture['initial_indent_node'][0]
-    print(capture['docstring'])
-    # TODO: does not handle missing Returns: clause
+    # print(capture['docstring'])
     docstring_types = docstring_parser.parse(capture['docstring'])
     inital_indent.prefix = mypy_py2_annotation(docstring_types)
     return node
@@ -64,7 +63,7 @@ def _detect_indent(filename: str, default='    '):
     This will take the first indent found in the file and use that as the
     model. In Python it is valid to have a different indentation style in
     every indented block in a file. But if you have code like that you don't
-    deserve to have nice things! (waterloo won't match and annotate any
+    deserve to have nice things! (so waterloo won't match and annotate any
     functions which have different indent styles from the initial one)
     """
     with open('junk/file_to_parse.py', 'rb') as f:
@@ -100,8 +99,12 @@ def annotate_file(filename: str, max_indent=8, **execute_kwargs):
         .filter(not_already_annotated_py2)
         .modify(annotate_py2)
     )
-    # TODO: remove types from docstring a la:
+    # TODO:
+    # remove types from docstring a la:
     # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#type-annotations
     # sphinx can still render types in docs in this case thanks to:
     # https://pypi.org/project/sphinx-autodoc-typehints/#using-type-hint-comments
+
+    # TODO:
+    # add imports for types
     q.execute(**execute_kwargs)

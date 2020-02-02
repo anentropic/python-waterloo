@@ -1,8 +1,0 @@
-first-chapter
-  paragraph-one
-      note-A # an important note here!
-      note-B
-  paragraph-two
-    note-1
-    note-2
-  paragraph-three

@@ -14,7 +14,11 @@ from megaparsy.char.lexer import (
 from megaparsy.control.applicative.combinators import between
 import parsy
 
-from waterloo.types import TypeAtom, VALID_ARGS_SECTION_NAMES, VALID_RETURNS_SECTION_NAMES
+from waterloo.types import (
+    TypeAtom,
+    VALID_ARGS_SECTION_NAMES,
+    VALID_RETURNS_SECTION_NAMES,
+)
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -84,17 +88,22 @@ var_name = lexeme(
 
 # a dotted import module path to a python var name
 dotted_var_path = lexeme(
-    python_identifier.sep_by(parsy.string('.'), min=1).combine(lambda *names: '.'.join(names))
+    python_identifier
+    .sep_by(parsy.string('.'), min=1)
+    .combine(lambda *names: '.'.join(names))
 )
 
 
 @parsy.generate
 def _nested():
+    """
+    Recursion helper for `type_atom`
+    """
     return (
         yield between(
             parsy.regex(r'\[\s*'),
             parsy.regex(r',?\s*\]'),  # allow line-breaks and trailing-comma
-            type_def.sep_by(parsy.regex(r',\s*')),  # includes new-lines
+            type_atom.sep_by(parsy.regex(r',\s*')),  # includes new-lines
         )
     )
 
@@ -102,18 +111,24 @@ def _nested():
 _type_token = dotted_var_path | parsy.string('...')
 
 # mypy type definition, parsed into its nested components
-type_def = parsy.seq(_type_token, _nested).combine(TypeAtom) | _type_token | _nested
+type_atom = (
+    parsy.seq(_type_token, _nested).combine(TypeAtom)
+    | _type_token.map(lambda t: TypeAtom(t, []))
+    | _nested  # recurse->
+)
 
 # in "Args" section the type def is in parentheses after the var name
 arg_type_def = lexeme(
-    parsy.string('(') >> type_def << parsy.regex(r'\)\:?')
+    parsy.string('(') >> type_atom << parsy.regex(r'\)\:?')
 )
 
-arg_type = parsy.seq(arg=var_name, type=arg_type_def.optional())  # seq kwargs needs Py 3.6+
+# NOTE: parsy.seq with kwargs needs Python 3.6+
+arg_type = parsy.seq(arg=var_name, type=arg_type_def.optional())
 
-# in "Returns" section the type def is bare and there is no var name, optional description
-# (description is not part of Napoleon spec but it's natural to provide one)
-return_type = type_def << parsy.regex(r'\:?')
+# in "Returns" section the type def is bare and there is no var name
+# (description is not part of Napoleon spec but it's natural to provide one
+# so we allow to parse a colon separator followed by optional description)
+return_type = type_atom << parsy.regex(r'\:?')
 
 
 # SECTION PARSERS

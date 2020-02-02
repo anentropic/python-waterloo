@@ -5,24 +5,7 @@ _type_getter = itemgetter('type')
 
 
 def _join_type_atoms(type_atoms):
-    return ', '.join(
-        type_atom_to_str(atom)
-        for atom in type_atoms
-    )
-
-
-def type_atom_to_str(type_atom):
-    # TODO: superseded by TypeAtom.to_annotation()
-    if isinstance(type_atom, str):
-        return type_atom
-    elif isinstance(type_atom, list):
-        # Callable
-        args_string = _join_type_atoms(type_atom)
-        return f'[{args_string}]'
-    else:
-        name, args = type_atom
-        args_string = _join_type_atoms(args)
-        return f'{name}[{args_string}]'
+    return ', '.join(atom.to_annotation() for atom in type_atoms)
 
 
 def mypy_py2_annotation(types_dict):

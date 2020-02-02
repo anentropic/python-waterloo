@@ -10,8 +10,9 @@ from waterloo.parsers.napoleon import (
     p_returns_block,
     rest_of_line,
     var_name,
-    type_def,
+    type_atom,
 )
+from waterloo.types import TypeAtom
 
 """
 Manually-constructed test-cases for the parsers
@@ -55,26 +56,59 @@ def test_var_name_invalid(example):
 
 
 @pytest.mark.parametrize('example,expected', [
-    ("str", "str"),
-    ("Dict", "Dict"),
-    ("Dict[int, str]", ("Dict", ["int", "str"])),
-    ("Dict[int, db.models.User]", ("Dict", ["int", "db.models.User"])),
-    ("my.generic.Container[int]", ("my.generic.Container", ["int"])),
-    ("Tuple[int, ...]", ("Tuple", ["int", "..."])),
-    ("Callable[[int, str], Dict[int, str]]", ("Callable", [["int", "str"], ("Dict", ["int", "str"])])),
+    ("str",
+     TypeAtom("str", [])),
+    ("Dict",
+     TypeAtom("Dict", [])),
+    ("Dict[int, str]",
+     TypeAtom("Dict", [
+        TypeAtom("int", []), TypeAtom("str", [])
+     ])),
+    ("Dict[int, db.models.User]",
+     TypeAtom("Dict", [
+        TypeAtom("int", []),
+        TypeAtom("db.models.User", [])
+     ])),
+    ("my.generic.Container[int]",
+     TypeAtom("my.generic.Container", [
+        TypeAtom("int", [])
+     ])),
+    ("Tuple[int, ...]",
+     TypeAtom("Tuple", [
+        TypeAtom("int", []), TypeAtom("...", [])
+     ])),
+    ("Callable[[int, str], Dict[int, str]]",
+     TypeAtom("Callable", [
+        [TypeAtom("int", []),
+         TypeAtom("str", [])],
+        TypeAtom("Dict", [
+            TypeAtom("int", []),
+            TypeAtom("str", [])
+        ])
+     ])),
     ("""Tuple[
             int,
             str,
             ClassName
-        ]""", ("Tuple", ["int", "str", "ClassName"])),
+        ]""",
+     TypeAtom("Tuple", [
+        TypeAtom("int", []),
+        TypeAtom("str", []),
+        TypeAtom("ClassName", [])
+     ])),
     ("""Tuple[
             int,
             str,
             ClassName,
-        ]""", ("Tuple", ["int", "str", "ClassName"])),
+        ]""",
+     TypeAtom("Tuple", [
+        TypeAtom("int", []),
+        TypeAtom("str", []),
+        TypeAtom("ClassName", [])
+     ])),
 ])
-def test_type_def_valid(example, expected):
-    result = type_def.parse(example)
+def test_type_atom_valid(example, expected):
+    result = type_atom.parse(example)
     assert result == expected
 
 
@@ -89,7 +123,7 @@ def test_arg_type(example):
     result = parser.parse(example)
     assert result == {
         'arg': 'key',
-        'type': 'str',
+        'type': TypeAtom('str', []),
     }
 
 
@@ -142,19 +176,19 @@ def test_p_arg_list():
     assert section['items'] == [
         {
             'arg': 'key',
-            'type': 'str',
+            'type': TypeAtom('str', []),
         },
         {
             'arg': 'num_tokens',
-            'type': 'int',
+            'type': TypeAtom('int', []),
         },
         {
             'arg': 'timeout',
-            'type': 'int',
+            'type': TypeAtom('int', []),
         },
         {
             'arg': 'retry_interval',
-            'type': ('Optional', ['float']),
+            'type': TypeAtom('Optional', [TypeAtom('float', [])]),
         },
         {
             'arg': '*inner_args',
@@ -177,7 +211,7 @@ def test_p_returns_block():
     section = p_returns_block.parse(example)
     assert section['name'] == 'Yields'  # either "Returns" or "Yields", distinction preserved
     assert section['items'] == [
-        ('Optional', ['float']),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
     ]
 
 
@@ -204,26 +238,26 @@ def test_docstring_parser():
             'items': [
                 {
                     'arg': 'key',
-                    'type': 'str',
+                    'type': TypeAtom('str', []),
                 },
                 {
                     'arg': 'num_tokens',
-                    'type': 'int',
+                    'type': TypeAtom('int', []),
                 },
                 {
                     'arg': 'timeout',
-                    'type': 'int',
+                    'type': TypeAtom('int', []),
                 },
                 {
                     'arg': 'retry_interval',
-                    'type': ('Optional', ['float']),
+                    'type': TypeAtom('Optional', [TypeAtom('float', [])]),
                 },
             ],
         },
         'returns': {
             'name': 'Returns',
             'items': [
-                'bool'
+                TypeAtom('bool', [])
             ],
         },
     }
@@ -258,26 +292,30 @@ def test_docstring_parser2():
             'items': [
                 {
                     'arg': 'key',
-                    'type': 'str',
+                    'type': TypeAtom('str', []),
                 },
                 {
                     'arg': 'num_tokens',
-                    'type': 'int',
+                    'type': TypeAtom('int', []),
                 },
                 {
                     'arg': 'timeout',
-                    'type': 'int',
+                    'type': TypeAtom('int', []),
                 },
                 {
                     'arg': 'retry_interval',
-                    'type': ('Optional', ['float']),
+                    'type': TypeAtom('Optional', [TypeAtom('float', [])]),
                 },
             ],
         },
         'returns': {
             'name': 'Returns',
             'items': [
-                ("Tuple", ["int", "str", "ClassName"])
+                TypeAtom("Tuple", [
+                    TypeAtom("int", []),
+                    TypeAtom("str", []),
+                    TypeAtom("ClassName", [])
+                ])
             ],
         },
     }

@@ -1,20 +1,7 @@
 import pytest
 
-from waterloo.utils import type_atom_to_str, mypy_py2_annotation
-
-
-@pytest.mark.parametrize('expected,example', [
-    ("str", "str"),
-    ("Dict", "Dict"),
-    ("Dict[int, str]", ("Dict", ["int", "str"])),
-    ("Dict[int, db.models.User]", ("Dict", ["int", "db.models.User"])),
-    ("my.generic.Container[int]", ("my.generic.Container", ["int"])),
-    ("Tuple[int, ...]", ("Tuple", ["int", "..."])),
-    ("Callable[[int, str], Dict[int, str]]", ("Callable", [["int", "str"], ("Dict", ["int", "str"])])),
-])
-def test_type_atom_to_str(expected, example):
-    val = type_atom_to_str(example)
-    assert val == expected
+from waterloo.types import TypeAtom
+from waterloo.utils import mypy_py2_annotation
 
 
 @pytest.mark.parametrize('example,expected', [
@@ -25,26 +12,26 @@ def test_type_atom_to_str(expected, example):
                 'items': [
                     {
                         'arg': 'key',
-                        'type': 'str',
+                        'type': TypeAtom('str', []),
                     },
                     {
                         'arg': 'num_tokens',
-                        'type': 'int',
+                        'type': TypeAtom('int', []),
                     },
                     {
                         'arg': 'timeout',
-                        'type': 'int',
+                        'type': TypeAtom('int', []),
                     },
                     {
                         'arg': 'retry_interval',
-                        'type': ('Optional', ['float']),
+                        'type': TypeAtom('Optional', [TypeAtom('float', [])]),
                     },
                 ],
             },
             'returns': {
                 'name': 'Returns',
                 'items': [
-                    'bool'
+                    TypeAtom('bool', [])
                 ],
             },
         },
@@ -57,26 +44,30 @@ def test_type_atom_to_str(expected, example):
                 'items': [
                     {
                         'arg': 'key',
-                        'type': 'str',
+                        'type': TypeAtom('str', []),
                     },
                     {
                         'arg': 'num_tokens',
-                        'type': 'int',
+                        'type': TypeAtom('int', []),
                     },
                     {
                         'arg': 'timeout',
-                        'type': 'int',
+                        'type': TypeAtom('int', []),
                     },
                     {
                         'arg': 'retry_interval',
-                        'type': ('Optional', ['float']),
+                        'type': TypeAtom('Optional', [TypeAtom('float', [])]),
                     },
                 ],
             },
             'returns': {
                 'name': 'Returns',
                 'items': [
-                    ("Tuple", ["int", "str", "ClassName"])
+                    TypeAtom("Tuple", [
+                        TypeAtom("int", []),
+                        TypeAtom("str", []),
+                        TypeAtom("ClassName", []),
+                    ])
                 ],
             },
         },

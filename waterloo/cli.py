@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import argparse
 import os
 import sys
@@ -10,7 +8,13 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 from waterloo.reader import annotate_file
 
 
-def main(files: Iterable[str], max_indent: int, interactive: bool, write: bool, silent: bool):
+def process(
+    files: Iterable[str],
+    max_indent: int,
+    interactive: bool,
+    write: bool,
+    silent: bool,
+):
     # TODO: multiprocess
     for filename in files:
         annotate_file(
@@ -22,7 +26,7 @@ def main(files: Iterable[str], max_indent: int, interactive: bool, write: bool, 
         )
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description='Convert Napoleon-style docstrings to mypy type annotations.'
     )
@@ -35,7 +39,8 @@ if __name__ == "__main__":
         '--max-indent-level', type=int, default=8,
         help='we have to generate pattern-matching indents in order to '
         'annotate nested functions, this is how many indent levels to '
-        'generate matches for',
+        'generate matches for (indents larger than this will not be '
+        'detected)',
     )
 
     parser.add_argument(
@@ -53,7 +58,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(
+    process(
         files=args.files,
         max_indent=args.max_indent_level,
         interactive=args.interactive,

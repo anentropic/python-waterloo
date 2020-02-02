@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from functools import partial
 
 import parsy
 import pytest
@@ -17,7 +18,7 @@ from waterloo.parsers.napoleon import (
     rest_of_line,
     returns_head,
     var_name,
-    type_def,
+    type_atom,
 )
 from waterloo.types import (
     TypeAtom,
@@ -41,6 +42,9 @@ class Example(NamedTuple):
 
 
 st_whitespace_char = st.text(' \t', min_size=1, max_size=1)
+
+st_small_lists = partial(st.lists, min_size=0, max_size=3)
+st_small_lists_nonempty = partial(st.lists, min_size=1, max_size=4)
 
 
 @st.composite
@@ -219,7 +223,7 @@ def test_arg_name(splat, name, trailing_ws, newline):
 
 
 @given(
-    segments=st.lists(st.text(min_size=0, max_size=10), min_size=1),
+    segments=st_small_lists_nonempty(st.text(min_size=0, max_size=10)),
     trailing_ws=st_whitespace(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
@@ -248,7 +252,7 @@ st_python_identifier = (
 
 @st.composite
 def st_dotted_var_path(draw):
-    segments = draw(st.lists(st_python_identifier, min_size=1))
+    segments = draw(st_small_lists_nonempty(st_python_identifier))
     return '.'.join(segments)
 
 
@@ -273,7 +277,7 @@ def st_generic_typeatom(draw, st_children):
     """
     return TypeAtom(
         name=draw(st_dotted_var_path()),
-        args=draw(st.lists(st_children))
+        args=draw(st_small_lists(st_children))
     )
 
 
@@ -287,7 +291,7 @@ def st_homogenous_tuple_typeatom(draw, st_children):
 
 @st.composite
 def st_callable_typeatom(draw, st_children):
-    args_param = draw(st.lists(st_children, min_size=1))
+    args_param = draw(st_small_lists_nonempty(st_children))
     returns_param = draw(st_children)
     return TypeAtom(
         name='Callable',
@@ -374,20 +378,18 @@ def _normalise_annotation(annotation):
     )
 
 
-def assert_annotation_roundtrip(example: str, result: Union[str, TypeAtom]):
-    if isinstance(result, TypeAtom):
-        result = result.to_annotation()
+def assert_annotation_roundtrip(example: str, result: TypeAtom):
     normalised = _normalise_annotation(example)
-    assert normalised == result
+    assert normalised == result.to_annotation()
 
 
 @given(st_napoleon_type_annotation())
-def test_type_def(example):
+def test_type_atom(example):
     """
     Generate an arbitrary ('dirty') type annotation and check that we can
     make a round-trip comparison of it with the parsed result.
     """
-    result = type_def.parse(example)
+    result = type_atom.parse(example)
     assert_annotation_roundtrip(example, result)
 
 
@@ -503,7 +505,7 @@ def test_ignored_line(indent, line_to_ignore):
 @given(
     indent=st_whitespace(),
     blank_lines=st.text('\n', min_size=0, max_size=2),
-    ignored_lines=st.lists(st_ignored_line),
+    ignored_lines=st_small_lists(st_ignored_line),
 )
 def test_ignored_lines(
     indent,
@@ -526,7 +528,7 @@ def test_ignored_lines(
 @st.composite
 def st_annotated_arg_full(draw, initial_indent, indent):
     first_line, arg_context = draw(st_annotated_arg())
-    wrapped_lines = draw(st.lists(st_rest_of_line, min_size=0, max_size=3))
+    wrapped_lines = draw(st_small_lists(st_rest_of_line))
     if wrapped_lines:
         continuation = "\n".join(
             f"{initial_indent}{indent*2}{indent}{line}"
@@ -557,10 +559,8 @@ def st_args_section(draw, initial_indent=None):
 
     args_head = draw(st_valid_args_head())
     annotated_args = draw(
-        st.lists(
+        st_small_lists_nonempty(
             st_annotated_arg_full(initial_indent, indent),
-            min_size=1,
-            max_size=3,
             unique_by=lambda a: a.context['arg_name']
         )
     )
@@ -618,7 +618,7 @@ def st_annotated_return(draw):
 @st.composite
 def st_annotated_return_full(draw, initial_indent, indent):
     first_line, context = draw(st_annotated_return())
-    wrapped_lines = draw(st.lists(st_rest_of_line, min_size=0, max_size=3))
+    wrapped_lines = draw(st_small_lists(st_rest_of_line))
     if wrapped_lines:
         continuation = "\n".join(
             f"{initial_indent}{indent*2}{indent}{line}"
@@ -682,7 +682,7 @@ def st_napoleon_docstring(draw):
     initial_indent = draw(st_whitespace())
 
     intro = "\n".join(
-        draw(st.lists(st_ignored_line))
+        draw(st_small_lists(st_ignored_line))
     )
     # last ignored_line has no trailing \n
     gap_1 = draw(st.text('\n', min_size=1, max_size=3)) if intro else ''
@@ -704,7 +704,7 @@ def st_napoleon_docstring(draw):
     gap_3 = draw(st.text('\n', min_size=0, max_size=2)) if returns_section[0] else ''
 
     following = "\n".join(
-        draw(st.lists(st_ignored_line))
+        draw(st_small_lists(st_ignored_line))
     )
 
     example = (

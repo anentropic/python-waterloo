@@ -19,9 +19,12 @@ VALID_RETURNS_SECTION_NAMES = {
 }
 
 
-def _repr_type_arg(arg):
-    if isinstance(arg, str):
-        return arg
+T_TypeAtomArgs = Iterable[Union[str, 'TypeAtom']]
+
+
+def _repr_type_arg(arg: Union[str, 'TypeAtom', T_TypeAtomArgs]) -> str:
+    if isinstance(arg, str) or not arg:
+        return arg or ''
     elif isinstance(arg, TypeAtom):
         return arg.to_annotation()
     elif isinstance(arg, Iterable):
@@ -33,9 +36,9 @@ def _repr_type_arg(arg):
 
 class TypeAtom(NamedTuple):
     name: str
-    args: Iterable[Union[str, 'TypeAtom']]
+    args: T_TypeAtomArgs
 
-    def to_annotation(self):
+    def to_annotation(self) -> str:
         if self.args:
             args_annotations = _repr_type_arg(self.args)
             return f"{self.name}{args_annotations}"

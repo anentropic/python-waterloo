@@ -1,1 +1,0 @@
-# waterloo-haskell
