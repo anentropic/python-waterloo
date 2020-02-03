@@ -1,29 +1,10 @@
 import argparse
 import os
 import sys
-from typing import Iterable
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
-from waterloo.reader import annotate_file
-
-
-def process(
-    files: Iterable[str],
-    max_indent: int,
-    interactive: bool,
-    write: bool,
-    silent: bool,
-):
-    # TODO: multiprocess
-    for filename in files:
-        annotate_file(
-            filename,
-            max_indent=max_indent,
-            interactive=interactive,
-            write=write,
-            silent=silent,
-        )
+from waterloo.annotator import annotate
 
 
 def main():
@@ -58,9 +39,9 @@ def main():
 
     args = parser.parse_args()
 
-    process(
-        files=args.files,
-        max_indent=args.max_indent_level,
+    annotate(
+        *args.files,
+        max_indent_level=args.max_indent_level,
         interactive=args.interactive,
         write=args.write,
         silent=args.silent,

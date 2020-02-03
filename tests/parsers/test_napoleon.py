@@ -122,6 +122,16 @@ def test_type_atom_valid(example, expected):
 
 
 @pytest.mark.parametrize('example', [
+    "Dict[int, str",
+    "Dict[int, [db.models.User]",
+    "Dict[int, [db.models.User]]]",
+])
+def test_type_atom_invalid(example):
+    with pytest.raises(parsy.ParseError):
+        type_atom.parse(example)
+
+
+@pytest.mark.parametrize('example', [
     "key (str): identifying a specific token bucket",
     "key (str): ",
     "key (str):",

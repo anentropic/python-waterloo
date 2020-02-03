@@ -292,7 +292,7 @@ def st_generic_typeatom(draw, st_children):
 def st_homogenous_tuple_typeatom(draw, st_children):
     return TypeAtom(
         name='Tuple',
-        args=(draw(st_children), '...')
+        args=(draw(st_children), TypeAtom('...', []))
     )
 
 
@@ -352,7 +352,7 @@ def st_napoleon_type_annotation(draw):
     - before a `]`
     """
     type_atom = draw(st_type_atom())
-    annotation = type_atom.to_annotation()
+    annotation = type_atom.to_annotation(False)
     return ''.join(
         _add_arbitrary_whitespace(
             segment=segment.strip(),
@@ -377,7 +377,7 @@ def _add_normalised_whitespace(segment):
 def _normalise_annotation(annotation):
     """
     Take a dirty annotation and strip spurious newlines and whitespace so that
-    it should match the output from an equivalent TypeAtom.to_annotation()
+    it should match the output from an equivalent TypeAtom.to_annotation(False)
     """
     return ''.join(
         _add_normalised_whitespace(segment.strip())
@@ -387,7 +387,7 @@ def _normalise_annotation(annotation):
 
 def assert_annotation_roundtrip(example: str, result: TypeAtom):
     normalised = _normalise_annotation(example)
-    assert normalised == result.to_annotation()
+    assert normalised == result.to_annotation(False)
 
 
 @given(st_napoleon_type_annotation())

@@ -103,6 +103,8 @@ dotted_var_path = lexeme(
 def _nested() -> parsy.Parser:
     """
     Recursion helper for `type_atom`
+
+    (looks for further type defs nested between `[` `]` pairs)
     """
     return (
         yield between(

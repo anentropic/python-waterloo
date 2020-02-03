@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import cast, Iterable, NamedTuple, Optional, Union
+from typing import cast, Iterable, NamedTuple, Optional, Set, Union
 
 
 class ArgsSection(str, Enum):
@@ -12,6 +12,11 @@ class ArgsSection(str, Enum):
 class ReturnsSection(str, Enum):
     RETURNS = 'Returns'
     YIELDS = 'Yields'
+
+
+class Types(str, Enum):
+    ELLIPSIS = '...'
+    NONE = 'None'
 
 
 # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections
@@ -32,16 +37,20 @@ VALID_RETURNS_SECTION_NAMES = {
 }
 
 
-T_TypeAtomArgs = Iterable[Union[str, 'TypeAtom']]  # type: ignore[misc]
-
-
-def _repr_type_arg(arg: Union[str, 'TypeAtom', T_TypeAtomArgs]) -> str:
+def _repr_type_arg(
+    arg: Union[str, 'TypeAtom', Iterable['TypeAtom']], fix_dotted_paths=True
+) -> str:
     if isinstance(arg, str) or not arg:
-        return cast(str, arg) or ''
+        val = cast(str, arg) or ''
+        if fix_dotted_paths and val != Types.ELLIPSIS:
+            val = val.split('.')[-1]
+        return val
     elif isinstance(arg, TypeAtom):
-        return arg.to_annotation()
+        return arg.to_annotation(fix_dotted_paths)
     elif isinstance(arg, Iterable):
-        sub_args = ", ".join(_repr_type_arg(sub) for sub in arg)
+        sub_args = ", ".join(
+            _repr_type_arg(sub, fix_dotted_paths) for sub in arg
+        )
         return f"[{sub_args}]"
     else:
         raise TypeError(arg)
@@ -49,14 +58,31 @@ def _repr_type_arg(arg: Union[str, 'TypeAtom', T_TypeAtomArgs]) -> str:
 
 class TypeAtom(NamedTuple):
     name: str
-    args: T_TypeAtomArgs  # type: ignore[misc]
+    args: Iterable['TypeAtom']  # type: ignore[misc]
 
-    def to_annotation(self) -> str:
+    def to_annotation(self, fix_dotted_paths=True) -> str:
+        name = _repr_type_arg(self.name, fix_dotted_paths)
         if self.args:
-            args_annotations = _repr_type_arg(self.args)
-            return f"{self.name}{args_annotations}"
+            args_annotations = _repr_type_arg(self.args, fix_dotted_paths)
+            return f"{name}{args_annotations}"
         else:
-            return self.name
+            return name
+
+    def type_names(self) -> Set[str]:
+        """
+        TODO:
+        should Callable args list be a TypeAtom with name=None?
+        (yes I think so)
+        """
+        names = set()
+        names.add(self.name)
+        for arg in self.args:
+            if isinstance(arg, TypeAtom):
+                names |= arg.type_names()
+            else:
+                for atom in arg:
+                    names |= atom.type_names()
+        return names
 
 
 @dataclass
@@ -84,6 +110,13 @@ class ArgTypes:
             arg is not None for arg in self.args.values()
         )
 
+    def type_names(self) -> Set[str]:
+        names: Set[str] = set()
+        for arg in self.args.values():
+            if arg:
+                names |= arg.type_names()
+        return names
+
 
 @dataclass
 class ReturnType:
@@ -98,6 +131,11 @@ class ReturnType:
         `type` so this is likely always `True`)
         """
         self.is_fully_typed = self.type is not None
+
+    def type_names(self) -> Set[str]:
+        if self.type:
+            return self.type.type_names()
+        return set()
 
 
 @dataclass
@@ -119,3 +157,11 @@ class TypeSignature:
                 or self.returns.is_fully_typed
             )
         )
+
+    def type_names(self) -> Set[str]:
+        names: Set[str] = set()
+        if self.args:
+            names |= self.args.type_names()
+        if self.returns:
+            names |= self.returns.type_names()
+        return names
