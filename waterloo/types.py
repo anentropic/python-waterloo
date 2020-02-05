@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import cast, Iterable, NamedTuple, Optional, Set, Union
+from typing import cast, Dict, Iterable, NamedTuple, Optional, Set, Union
 
 
 class ArgsSection(str, Enum):
@@ -165,3 +165,8 @@ class TypeSignature:
         if self.returns:
             names |= self.returns.type_names()
         return names
+
+
+class ImportsForTypes(NamedTuple):
+    imports: Dict[str, Set[str]]
+    unimported: Set[str]

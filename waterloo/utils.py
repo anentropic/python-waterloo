@@ -1,8 +1,8 @@
 import typing
 from operator import itemgetter
-from typing import cast, Iterable, List, Set
+from typing import cast, Dict, Iterable, Set
 
-from waterloo.types import TypeAtom, Types, TypeSignature
+from waterloo.types import ImportsForTypes, TypeAtom, Types, TypeSignature
 
 
 def _join_type_atoms(type_atoms: Iterable[TypeAtom]) -> str:
@@ -73,22 +73,7 @@ def _is_dotted_path(name: str):
     return '.' in name and name != Types.ELLIPSIS
 
 
-def _get_typing_imports(type_names: Set[str]) -> str:
-    return "from typing import {}".format(
-        ", ".join(sorted(type_names))
-    )
-
-
-def _get_dotted_path_imports(type_names: Set[str]) -> List[str]:
-    # isort will later collapse redundant import lines
-    # i.e. different members from the same module
-    return [
-        "from {} import {}".format(*name.rsplit('.', maxsplit=1))
-        for name in type_names
-    ]
-
-
-def get_import_lines(type_names: Set[str]) -> List[str]:
+def get_import_lines(type_names: Set[str]) -> ImportsForTypes:
     """
     We assume a type is either:
     - a builtin (e.g `str`, `int` etc)
@@ -107,11 +92,27 @@ def get_import_lines(type_names: Set[str]) -> List[str]:
     """
     builtins = {name for name in type_names if _is_builtin_type(name)}
     type_names -= builtins
+
     typing_types = {name for name in type_names if _is_typing_type(name)}
     type_names -= typing_types
+
     dotted_paths = {name for name in type_names if _is_dotted_path(name)}
     type_names -= dotted_paths
+    # assume remaining type_names are definied in the file or already imported
 
-    lines = [_get_typing_imports(typing_types)]
-    lines.extend(_get_dotted_path_imports(dotted_paths))
-    return lines
+    import_tuples = [
+        ('typing', name)
+        for name in typing_types
+    ]
+    import_tuples.extend(
+        tuple(name.rsplit('.', maxsplit=1))
+        for name in dotted_paths
+    )
+    imports_dict = {}
+    for left, right in import_tuples:
+        imports_dict.setdefault(left, set()).add(right)
+
+    return ImportsForTypes(
+        imports=imports_dict,
+        unimported=type_names,
+    )

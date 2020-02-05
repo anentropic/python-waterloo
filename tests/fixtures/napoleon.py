@@ -46,7 +46,7 @@ def second(products, getter):
         """
         Args:
             product (Dict[str, Any])
-            key (str)
+            key (MysteryType[str])
             default (Any)
 
         Raises:

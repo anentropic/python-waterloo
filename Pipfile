@@ -16,6 +16,8 @@ megaparsy = {git = "https://github.com/anentropic/megaparsy"}
 termcolor = "*"
 mypy = "*"
 bowler = "*"
+loguru = "*"
+colored = "*"
 
 [requires]
 python_version = "3.7"
