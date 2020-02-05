@@ -4,7 +4,7 @@ from loguru import logger
 
 
 # https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.add
-LOG_FORMAT = '<level>{message}</level>'
+LOG_FORMAT = '{level.icon} <level>{message}</level>'
 
 logger.configure(
     handlers=[
@@ -12,5 +12,5 @@ logger.configure(
     ],
 )
 logger.level(name='ERROR', color='<red>')
-logger.level(name='WARNING', color='<yellow>')
-logger.level(name='INFO', color='<white>')
+logger.level(name='WARNING', color='<yellow>', icon='⚠️ ')
+logger.level(name='INFO', color='<white>', icon='')

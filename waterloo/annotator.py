@@ -1,9 +1,9 @@
 import re
 from threading import local
-from typing import cast, Iterable, List, Optional, Set, Type
+from typing import cast, List, Optional, Set, Sequence, Type
 
 from bowler import Capture, Filename, LN, Query
-from colored import style
+from colored import fore, style, stylize
 from fissix.fixer_base import BaseFix
 from fissix.fixer_util import Newline
 from fissix.pgen2 import token
@@ -99,9 +99,9 @@ def f_has_docstring(node: LN, capture: Capture, filename: Filename) -> bool:
     """
     try:
         docstring_node = capture['docstring_parent_node'].children[0]
+        result = bool(IS_DOCSTRING_RE.search(docstring_node.value))
     except (AttributeError, IndexError):
         return False
-    result = bool(IS_DOCSTRING_RE.search(docstring_node.value))
     capture['docstring'] = docstring_node.value
     return result
 
@@ -119,6 +119,16 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
 
     # TODO: error handling
     signature = docstring_parser.parse(capture['docstring'])
+    if not signature.has_types:
+        return node
+
+    if not signature.is_fully_typed:
+        function_name = stylize(capture['function_name'].value, style.BOLD)
+        logger.warning(
+            f"Docstring for {function_name}{fore.YELLOW} did"
+            f" not fully specify args and return types. Check the generated"
+            f" annotation 👀"
+        )
 
     _record_type_names(filename, signature.type_names())
 
@@ -174,7 +184,7 @@ def _find_import_pos(root: Node) -> int:
     return insert_pos
 
 
-def _make_import_node(left: str, right: Iterable[str]) -> Node:
+def _make_import_node(left: str, right: Sequence[str]) -> Node:
     assert right  # non-empty
     name_leaves = [Leaf(token.NAME, right[0], prefix=" ")]
     name_leaves.extend(
@@ -205,9 +215,13 @@ class AddTypeImports(NonMatchingFixer):
         imports_dict, unimported = get_import_lines(type_names)
         if unimported:
             logger.warning(
-                "Could not determine imports for these types: {}\n"
-                "(assuming already imported or defined in file)",
-                ", ".join(sorted(unimported))
+                "Could not determine imports for these types: {}{}\n"
+                "   (assuming already imported or defined in file)",
+                f"{fore.YELLOW}, ".join(
+                    stylize(name, style.BOLD)
+                    for name in sorted(unimported)
+                ),
+                fore.YELLOW,
             )
 
         insert_pos = _find_import_pos(tree)
@@ -283,7 +297,9 @@ def annotate(
         WaterlooQuery(*paths)
         .select(
             r"""
-            funcdef< any* ':'
+            funcdef<
+                'def' function_name=any
+                any* ':'
                 suite< '\n'
                     initial_indent_node=(%s)
                     docstring_parent_node=simple_stmt< any* >
@@ -292,8 +308,8 @@ def annotate(
             >
             """ % indent_patterns
         )
-        .filter(f_not_already_annotated_py2)
         .filter(f_has_docstring)
+        .filter(f_not_already_annotated_py2)
         .modify(m_add_type_comment)
         .raw_fixer(StartFile)
         .raw_fixer(AddTypeImports)

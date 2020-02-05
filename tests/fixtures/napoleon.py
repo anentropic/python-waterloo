@@ -78,3 +78,20 @@ def fourth(product_id, user_id):
     Already annotated
     """
     return 'whatever'
+
+
+def fifth(product_ids, user_id=None):
+    """
+    Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus
+    saepe eveniet ut et voluptates repudiandae sint et molestiae non
+    recusandae.
+
+    Kwargs:
+        product_ids: this arg has no type info
+        user_id (Optional[int]): if given, also set the "liked" flag, meaning
+            the current user has liked a product in the list
+
+    Returns:
+        bool
+    """
+    pass

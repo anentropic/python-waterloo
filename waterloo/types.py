@@ -143,6 +143,7 @@ class TypeSignature:
     args: Optional[ArgTypes]
     returns: Optional[ReturnType]
 
+    has_types: bool = field(init=False)
     is_fully_typed: bool = field(init=False)
 
     def __post_init__(self):
@@ -150,6 +151,7 @@ class TypeSignature:
         If `self.returns is None` we can (optionally) assume the signature
         should be `-> None`. For everything else we require `is_fully_typed`.
         """
+        self.has_types = self.args or self.returns
         self.is_fully_typed = (
             self.args and self.args.is_fully_typed
             and (

@@ -1,6 +1,6 @@
 import typing
 from operator import itemgetter
-from typing import cast, Dict, Iterable, Set
+from typing import cast, Dict, Iterable, Set, Tuple
 
 from waterloo.types import ImportsForTypes, TypeAtom, Types, TypeSignature
 
@@ -105,10 +105,10 @@ def get_import_lines(type_names: Set[str]) -> ImportsForTypes:
         for name in typing_types
     ]
     import_tuples.extend(
-        tuple(name.rsplit('.', maxsplit=1))
+        cast(Tuple[str, str], tuple(name.rsplit('.', maxsplit=1)))
         for name in dotted_paths
     )
-    imports_dict = {}
+    imports_dict: Dict[str, Set[str]] = {}
     for left, right in import_tuples:
         imports_dict.setdefault(left, set()).add(right)
 
