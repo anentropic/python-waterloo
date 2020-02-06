@@ -30,7 +30,7 @@ setup(
     ),
     long_description=long_description,
 
-    url='https://github.com/anentropic/waterloo',
+    url='https://github.com/anentropic/python-waterloo',
 
     author='Anentropic',
     author_email='ego@anentropic.com',

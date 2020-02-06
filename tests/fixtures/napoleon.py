@@ -46,7 +46,8 @@ def second(products, getter):
         """
         Args:
             product (Dict[str, Any])
-            key (MysteryType[str])
+            key (MysteryType[str]): this type has not been imported and is not
+                defined in the document!
             default (Any)
 
         Raises:
