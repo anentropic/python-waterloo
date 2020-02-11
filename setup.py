@@ -7,7 +7,7 @@ here = path.abspath(path.dirname(__file__))
 
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # Get content from __about__.py
@@ -52,8 +52,9 @@ setup(
     ],
     python_requires='~=3.6',
     install_requires=[
-        'megaparsy',
-        'bowler',
+        'megaparsy>=0.1.3,<0.2.0',
+        'bowler>=0.8.0,<0.9.0',
+        'prompt-toolkit>=3.0.0,<3.1.0',
     ],
 
     packages=[

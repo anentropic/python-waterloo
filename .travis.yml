@@ -1,0 +1,17 @@
+# needed for python >= 3.6
+sudo: required
+dist: xenial
+# ---
+language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+install:
+  - pip install hypothesis
+  - pip install mypy
+  - pip install .
+  # (note: pytest already available in travis, breaks if we install our own)
+script:
+  - mypy --ignore-missing-imports --show-error-codes waterloo
+  - pytest tests/
