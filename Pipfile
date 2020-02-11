@@ -4,20 +4,18 @@ verify_ssl = true
 name = "pypi"
 
 [dev-packages]
-ipython = "*"
+ipython = ">=7.10.1"
 ipdb = "*"
 pdbpp = "*"
 twine = "*"
 pytest = "*"
 hypothesis = "*"
+mypy = "*"
 
 [packages]
 megaparsy = {git = "https://github.com/anentropic/megaparsy"}
-termcolor = "*"
-mypy = "*"
 bowler = "*"
-loguru = "*"
-colored = "*"
+prompt-toolkit = "*"
 
 [requires]
 python_version = "3.7"

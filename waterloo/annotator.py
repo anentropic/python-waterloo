@@ -3,21 +3,22 @@ from threading import local
 from typing import cast, List, Optional, Set, Sequence, Type
 
 from bowler import Capture, Filename, LN, Query
-from colored import fore, style, stylize
 from fissix.fixer_base import BaseFix
 from fissix.fixer_util import Newline
 from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
-from loguru import logger
 
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.utils import get_type_comment, get_import_lines
+from waterloo.utils import get_type_comment, get_import_lines, StylePrinter
 
 
 IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
 
 threadlocals = local()  # used in bowler subprocesses only
+
+
+echo = StylePrinter()
 
 
 class NonMatchingFixer(BaseFix):
@@ -36,16 +37,16 @@ class NonMatchingFixer(BaseFix):
 
 class StartFile(NonMatchingFixer):
     def start_tree(self, tree: Node, filename: str) -> None:
-        logger.info(f"{style.BOLD}{filename}{style.RESET}")
+        echo.info(f"<b>{filename}</b>")
 
 
 class EndFile(NonMatchingFixer):
     def finish_tree(self, tree: Node, filename: str) -> None:
         if threadlocals.type_names.get(filename):
-            logger.info("type comments added 🎉")
+            echo.info("-> type comments added 🎉")
         else:
-            logger.info("(no docstring types found)")
-        logger.info("")
+            echo.info("(no docstring types found)")
+        echo.info("")
 
 
 def _get_type_names(filename: Filename) -> Set[str]:
@@ -123,9 +124,9 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
         return node
 
     if not signature.is_fully_typed:
-        function_name = stylize(capture['function_name'].value, style.BOLD)
-        logger.warning(
-            f"Docstring for {function_name}{fore.YELLOW} did"
+        function_name = capture['function_name'].value
+        echo.warning(
+            f"⚠️  Docstring for <b>{function_name}</b> did"
             f" not fully specify args and return types. Check the generated"
             f" annotation 👀"
         )
@@ -213,14 +214,14 @@ class AddTypeImports(NonMatchingFixer):
         type_names = _get_type_names(cast(Filename, filename))
         imports_dict, unimported = get_import_lines(type_names)
         if unimported:
-            logger.warning(
-                "Could not determine imports for these types: {}{}\n"
-                "   (assuming already imported or defined in file)",
-                f"{fore.YELLOW}, ".join(
-                    stylize(name, style.BOLD)
-                    for name in sorted(unimported)
-                ),
-                fore.YELLOW,
+            echo.warning(
+                "⚠️  Could not determine imports for these types: {}\n"
+                "   (will assume it is already imported or defined in file)".format(
+                    f", ".join(
+                        f"<b>{name}</b>"
+                        for name in sorted(unimported)
+                    )
+                )
             )
 
         insert_pos = _find_import_pos(tree)
@@ -264,7 +265,7 @@ def annotate(
 ):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
-    to suppor them. Quality of the output very much depends on quality of
+    to support them. Quality of the output very much depends on quality of
     your docstrings.
 
     See https://pybowler.io/docs/api-query#execute for options.

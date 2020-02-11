@@ -1,8 +1,17 @@
 from __future__ import annotations
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import cast, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
+from typing import (
+    cast,
+    Dict,
+    Iterable,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 from typing_extensions import Protocol
 
 
@@ -71,7 +80,7 @@ class TypeAtomic(Protocol):
 
 class TypeAtom(NamedTuple):
     name: str
-    args: Iterable['TypeAtom']  # type: ignore[misc]
+    args: Iterable['TypeAtom']
 
     def to_annotation(self, fix_dotted_paths=True) -> str:
         name = _repr_type_arg(self.name, fix_dotted_paths)

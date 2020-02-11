@@ -52,7 +52,7 @@ setup(
     ],
     python_requires='~=3.6',
     install_requires=[
-        'megaparsy>=0.1.3,<0.2.0',
+        'megaparsy>=0.1.4,<0.2.0',
         'bowler>=0.8.0,<0.9.0',
         'prompt-toolkit>=3.0.0,<3.1.0',
     ],
