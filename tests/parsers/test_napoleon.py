@@ -19,9 +19,12 @@ from waterloo.types import (
     ArgTypes,
     ReturnsSection,
     ReturnType,
+    SourcePos,
     TypeAtom,
+    TypeDef,
     TypeSignature,
 )
+from waterloo.utils import slice_by_pos
 
 """
 Manually-constructed test-cases for the parsers
@@ -139,11 +142,23 @@ def test_type_atom_invalid(example):
 ])
 def test_arg_type(example):
     parser = arg_type << rest_of_line
+
     result = parser.parse(example)
+
     assert result == {
         'arg': 'key',
-        'type': TypeAtom('str', []),
+        'type': TypeDef(
+            SourcePos(0, 5),
+            TypeAtom('str', []),
+            SourcePos(0, 8),
+        )
     }
+
+    assert result['type'].name == 'str'
+    assert result['type'].args == []
+
+    start, _, end = result['type']
+    assert slice_by_pos(example, start, end) == 'str'
 
 
 @pytest.mark.parametrize('example', [
@@ -193,10 +208,30 @@ def test_p_arg_list():
     section = p_arg_list.parse(example)
     assert section.name == ArgsSection.ARGS  # normalised -> "Args" (Enum)
     assert section.args == OrderedDict([
-        ('key', TypeAtom('str', [])),
-        ('num_tokens', TypeAtom('int', [])),
-        ('timeout', TypeAtom('int', [])),
-        ('retry_interval', TypeAtom('Optional', [TypeAtom('float', [])])),
+        ('key',
+         TypeDef.from_tuples(
+            (2, 17),
+            ('str', []),
+            (2, 20),
+         )),
+        ('num_tokens',
+         TypeDef.from_tuples(
+            (3, 24),
+            ('int', []),
+            (3, 27),
+         )),
+        ('timeout',
+         TypeDef.from_tuples(
+            (5, 21),
+            ('int', []),
+            (5, 24),
+         )),
+        ('retry_interval',
+         TypeDef.from_tuples(
+            (6, 28),
+            ('Optional', [TypeAtom('float', [])]),
+            (6, 43),
+         )),
         ('*inner_args', None),
         ('**inner_kwargs', None),
     ])
@@ -211,7 +246,11 @@ def test_p_returns_block():
     """
     section = p_returns_block.parse(example)
     assert section.name == ReturnsSection.YIELDS  # normalised -> "Returns" (Enum)
-    assert section.type == TypeAtom('Optional', [TypeAtom('float', [])])
+    assert section.type_def == TypeDef.from_tuples(
+        (2, 12),
+        ('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+    )
 
 
 def test_docstring_parser():
@@ -231,20 +270,43 @@ def test_docstring_parser():
             bool: whether we got the requested tokens or not
                 (False if timed out)
         """
-    expected = TypeSignature(
-        args=ArgTypes(
+    expected = TypeSignature.factory(
+        args=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
-                ('key', TypeAtom('str', [])),
-                ('num_tokens', TypeAtom('int', [])),
-                ('timeout', TypeAtom('int', [])),
+                ('key',
+                 TypeDef.from_tuples(
+                    (4, 17),
+                    ('str', []),
+                    (4, 20),
+                 )),
+                ('num_tokens',
+                 TypeDef.from_tuples(
+                    (5, 24),
+                    ('int', []),
+                    (5, 27),
+                 )),
+                ('timeout',
+                 TypeDef.from_tuples(
+                    (7, 21),
+                    ('int', []),
+                    (7, 24),
+                 )),
                 ('retry_interval',
-                 TypeAtom('Optional', [TypeAtom('float', [])])),
-            ])
+                 TypeDef.from_tuples(
+                    (8, 28),
+                    ('Optional', [TypeAtom('float', [])]),
+                    (8, 43),
+                 )),
+            ]),
         ),
-        returns=ReturnType(
+        returns=ReturnType.factory(
             name=ReturnsSection.RETURNS,
-            type=TypeAtom('bool', []),
+            type_def=TypeDef.from_tuples(
+                (13, 12),
+                ('bool', []),
+                (13, 16),
+            ),
         )
     )
 
@@ -272,25 +334,66 @@ def test_docstring_parser2():
                 ClassName,
             ]
         """
-    expected = TypeSignature(
-        args=ArgTypes(
+    expected = TypeSignature.factory(
+        args=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
-                ('key', TypeAtom('str', [])),
-                ('num_tokens', TypeAtom('int', [])),
-                ('timeout', TypeAtom('int', [])),
+                ('key',
+                 TypeDef.from_tuples(
+                    (4, 17),
+                    ('str', []),
+                    (4, 20),
+                 )),
+                ('num_tokens',
+                 TypeDef.from_tuples(
+                    (5, 24),
+                    ('int', []),
+                    (5, 27),
+                 )),
+                ('timeout',
+                 TypeDef.from_tuples(
+                    (7, 21),
+                    ('int', []),
+                    (7, 24),
+                 )),
                 ('retry_interval',
-                 TypeAtom('Optional', [TypeAtom('float', [])])),
-            ])
-        ),
-        returns=ReturnType(
-            name=ReturnsSection.RETURNS,
-            type=TypeAtom("Tuple", [
-                TypeAtom("int", []),
-                TypeAtom("str", []),
-                TypeAtom("ClassName", [])
+                 TypeDef.from_tuples(
+                    (8, 28),
+                    ('Optional', [TypeAtom('float', [])]),
+                    (8, 43),
+                 )),
             ]),
+        ),
+        returns=ReturnType.factory(
+            name=ReturnsSection.RETURNS,
+            type_def=TypeDef.from_tuples(
+                (13, 12),
+                ("Tuple", [
+                    TypeAtom("int", []),
+                    TypeAtom("str", []),
+                    TypeAtom("ClassName", [])
+                ]),
+                (17, 13),
+            ),
         )
+    )
+
+    result = docstring_parser.parse(example)
+    assert result == expected
+
+
+def test_docstring_parser_no_annotations():
+    example = """
+        Will block thread until `num_tokens` could be consumed from token bucket `key`.
+
+        key (str): identifying a specific token bucket
+
+        bool: whether we got the requested tokens or not
+            (False if timed out)
+        """
+    expected = TypeSignature.factory(
+        args=None,
+        returns=None,
     )
 
     result = docstring_parser.parse(example)

@@ -20,10 +20,12 @@ from waterloo.types import (
     ArgTypes,
     ReturnType,
     TypeAtom,
+    TypeDef,
     TypeSignature,
     VALID_ARGS_SECTION_NAMES,
     VALID_RETURNS_SECTION_NAMES,
 )
+from .utils import typed_mark
 
 
 __all__ = ('docstring_parser',)
@@ -124,9 +126,10 @@ type_atom = (
     | _nested  # recurse->
 )
 
+
 # in "Args" section the type def is in parentheses after the var name
 arg_type_def = lexeme(
-    parsy.string('(') >> type_atom << parsy.regex(r'\)\:?')
+    parsy.string('(') >> typed_mark(type_atom, TypeDef) << parsy.regex(r'\)\:?')
 )
 
 # NOTE: parsy.seq with kwargs needs Python 3.6+
@@ -135,7 +138,7 @@ arg_type = parsy.seq(arg=var_name, type=arg_type_def.optional())
 # in "Returns" section the type def is bare and there is no var name
 # (description is not part of Napoleon spec but it's natural to provide one
 # so we allow to parse a colon separator followed by optional description)
-return_type = type_atom << parsy.regex(r'\:?')
+return_type = typed_mark(type_atom, TypeDef) << parsy.regex(r'\:?')
 
 
 # SECTION PARSERS
@@ -206,7 +209,7 @@ p_arg_list = indent_block(
         indent_block(scn, indented_items(arg_type << rest_of_line))
     )
 ).map(
-    lambda section: ArgTypes(
+    lambda section: ArgTypes.factory(
         name=section['name'],
         args=OrderedDict(
             (item['arg'], item['type'])
@@ -222,9 +225,9 @@ p_returns_block = indent_block(
         indent_block(scn, indented_items(return_type << rest_of_line))
     )
 ).map(
-    lambda section: ReturnType(
+    lambda section: ReturnType.factory(
         name=section['name'],
-        type=section['items'][0] if section['items'] else None
+        type_def=section['items'][0] if section['items'] else None
     )
 )
 
@@ -243,7 +246,7 @@ docstring_parser: parsy.Parser = (
         args=(ignored_line.many() >> p_arg_list).optional(),
         returns=(ignored_line.many() >> p_returns_block).optional(),
     ).combine_dict(
-        TypeSignature
+        TypeSignature.factory
     )
     << parsy.regex(r'.*', re.DOTALL)
 )

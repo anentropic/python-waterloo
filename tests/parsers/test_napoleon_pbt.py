@@ -23,9 +23,12 @@ from waterloo.parsers.napoleon import (
 from waterloo.types import (
     ArgsSection,
     TypeAtom,
+    TypeDef,
+    SourcePos,
     VALID_ARGS_SECTION_NAMES,
     VALID_RETURNS_SECTION_NAMES,
 )
+from waterloo.utils import slice_by_pos
 
 
 """
@@ -434,6 +437,15 @@ def st_annotated_arg(draw):
             st_arg_description_start(),
         )
     )
+    type_lines = type_annotation.split("\n")
+    start_pos = SourcePos(
+        row=0,
+        col=len(arg_name) + len(whitespace) + 1
+    )
+    end_pos = SourcePos(
+        row=0 + len(type_lines) - 1,
+        col=len(type_lines[-1])
+    )
     return Example(
         f"{arg_name}{whitespace}({type_annotation}){trailer}",
         {
@@ -441,6 +453,8 @@ def st_annotated_arg(draw):
             'whitespace': whitespace,
             'type_annotation': type_annotation,
             'trailer': trailer,
+            'start_pos': start_pos,
+            'end_pos': end_pos,
         }
     )
 
@@ -449,13 +463,16 @@ def st_annotated_arg(draw):
 def test_arg_type_annotated(annotated_arg_example):
     """
     Test that we can parse the first line of an arg and its description
-    and extract the arg name and a TypeAtom
+    and extract the arg name and a TypeDef
     """
     example, context = annotated_arg_example
     parser = arg_type << rest_of_line
     result = parser.parse(example)
     assert result['arg'] == context['arg_name']
     assert_annotation_roundtrip(context['type_annotation'], result['type'])
+
+    start, _, end = result['type']
+    assert slice_by_pos(example, start, end) == context['type_annotation']
 
 
 @given(
@@ -533,9 +550,14 @@ def test_ignored_lines(
 
 
 @st.composite
-def st_annotated_arg_full(draw, initial_indent, indent):
+def st_annotated_arg_full(draw, initial_indent, indent, row_offset=0):
     first_line, arg_context = draw(st_annotated_arg())
     wrapped_lines = draw(st_small_lists(st_rest_of_line))
+
+    offset = SourcePos(row_offset, len(initial_indent) + len(indent))
+    arg_context['start_pos'] += offset
+    arg_context['end_pos'] += offset
+
     if wrapped_lines:
         continuation = "\n".join(
             f"{initial_indent}{indent*2}{indent}{line}"
@@ -553,7 +575,7 @@ def st_annotated_arg_full(draw, initial_indent, indent):
 
 
 @st.composite
-def st_args_section(draw, initial_indent=None):
+def st_args_section(draw, initial_indent=None, row_offset=0):
     """
     Header plus a list of annotated args
     """
@@ -564,10 +586,14 @@ def st_args_section(draw, initial_indent=None):
     else:
         indent = draw(st_whitespace(min_size=2))
 
-    args_head = draw(st_valid_args_head())
+    args_head = draw(st_valid_args_head())  # includes line-break
     annotated_args = draw(
         st_small_lists_nonempty(
-            st_annotated_arg_full(initial_indent, indent),
+            st_annotated_arg_full(
+                initial_indent=initial_indent,
+                indent=indent,
+                row_offset=row_offset + 1,
+            ),
             unique_by=lambda a: a.context['arg_name']
         )
     )
@@ -581,26 +607,29 @@ def st_args_section(draw, initial_indent=None):
     )
 
 
-def _validate_args_section(result, context):
+def _validate_args_section(example, result, context):
     # normalised "<any valid>" -> "Args" (Enum)
     assert result.name == ArgsSection.ARGS
 
-    expected_arg_type_map = OrderedDict(
+    expected_arg_type_map: Dict[str, str] = OrderedDict(
         (ex_arg.context['arg_name'], ex_arg.context['type_annotation'])
         for ex_arg in context['annotated_args']
     )
     assert expected_arg_type_map.keys() == result.args.keys()
 
     for name, result_type in result.args.items():
-        example = expected_arg_type_map[name]
-        assert_annotation_roundtrip(example, result_type)
+        type_annotation_str = expected_arg_type_map[name]
+        assert_annotation_roundtrip(type_annotation_str, result_type)
+
+        start, _, end = result_type
+        assert slice_by_pos(example, start, end) == type_annotation_str
 
 
 @given(st_args_section())
 def test_p_arg_list(args_section):
     example, context = args_section
     result = p_arg_list.parse(example)
-    _validate_args_section(result, context)
+    _validate_args_section(example, result, context)
 
 
 @st.composite
@@ -612,19 +641,35 @@ def st_annotated_return(draw):
             st_arg_description_start(),
         )
     )
+    type_lines = type_annotation.split("\n")
+    start_pos = SourcePos(
+        row=0,
+        col=0
+    )
+    end_pos = SourcePos(
+        row=0 + len(type_lines) - 1,
+        col=len(type_lines[-1])
+    )
     return Example(
         f"{type_annotation}{trailer}",
         {
             'type_annotation': type_annotation,
             'trailer': trailer,
+            'start_pos': start_pos,
+            'end_pos': end_pos,
         }
     )
 
 
 @st.composite
-def st_annotated_return_full(draw, initial_indent, indent):
+def st_annotated_return_full(draw, initial_indent, indent, row_offset=0):
     first_line, context = draw(st_annotated_return())
     wrapped_lines = draw(st_small_lists(st_rest_of_line))
+
+    offset = SourcePos(row_offset, len(initial_indent) + len(indent))
+    context['start_pos'] += offset
+    context['end_pos'] += offset
+
     if wrapped_lines:
         continuation = "\n".join(
             f"{initial_indent}{indent*2}{indent}{line}"
@@ -642,7 +687,7 @@ def st_annotated_return_full(draw, initial_indent, indent):
 
 
 @st.composite
-def st_returns_section(draw, initial_indent=None):
+def st_returns_section(draw, initial_indent=None, row_offset=0):
     """
     Header plus the return type with optional description
     """
@@ -655,7 +700,11 @@ def st_returns_section(draw, initial_indent=None):
 
     returns_head = draw(st_valid_returns_head())
     annotated_return = draw(
-        st_annotated_return_full(initial_indent, indent)
+        st_annotated_return_full(
+            initial_indent=initial_indent,
+            indent=indent,
+            row_offset=row_offset + 1,
+        )
     )
 
     return Example(
@@ -667,34 +716,37 @@ def st_returns_section(draw, initial_indent=None):
     )
 
 
-def _validate_returns_section(result, context):
+def _validate_returns_section(example, result, context):
     assert result.name in VALID_RETURNS_SECTION_NAMES
     assert result.name == VALID_RETURNS_SECTION_NAMES[result.name][1]
 
-    example = context['annotated_return'].context['type_annotation']
-    assert_annotation_roundtrip(example, result.type)
+    type_annotation_str = context['annotated_return'].context['type_annotation']
+    assert_annotation_roundtrip(type_annotation_str, result.type_def)
+
+    start, _, end = result.type_def
+    assert slice_by_pos(example, start, end) == type_annotation_str
 
 
 @given(st_returns_section())
 def test_p_returns_block(returns_section):
     example, context = returns_section
     result = p_returns_block.parse(example)
-    _validate_returns_section(result, context)
+    _validate_returns_section(example, result, context)
 
 
 @st.composite
 def st_napoleon_docstring(draw):
     initial_indent = draw(st_whitespace())
 
-    intro = "\n".join(
-        draw(st_small_lists(st_ignored_line))
-    )
+    _intro_lines = draw(st_small_lists(st_ignored_line))
+    intro = "\n".join(_intro_lines)
     # last ignored_line has no trailing \n
     gap_1 = draw(st.text('\n', min_size=1, max_size=3)) if intro else ''
 
+    row_offset = len(_intro_lines) + len(gap_1)
     args_section = draw(
         st.one_of(
-            st_args_section(initial_indent),
+            st_args_section(initial_indent, row_offset=row_offset),
             st.just(Example('', {}))
         )
     )
@@ -704,9 +756,10 @@ def st_napoleon_docstring(draw):
         else ''
     )
 
+    row_offset += len(args_section[0].split("\n")) + len(gap_2)
     returns_section = draw(
         st.one_of(
-            st_returns_section(initial_indent),
+            st_returns_section(initial_indent, row_offset=row_offset),
             st.just(Example('', {}))
         )
     )
@@ -747,6 +800,7 @@ def test_docstring_parser(docstring):
     if context['args_section'][0]:
         note(f"args_section: {context['args_section'][0]}")
         _validate_args_section(
+            example,
             result.args,
             context['args_section'].context,
         )
@@ -754,6 +808,7 @@ def test_docstring_parser(docstring):
     if context['returns_section'][0]:
         note(f"returns_section: {context['returns_section'][0]}")
         _validate_returns_section(
+            example,
             result.returns,
             context['returns_section'].context,
         )

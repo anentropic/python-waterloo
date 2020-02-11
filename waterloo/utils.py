@@ -1,8 +1,15 @@
 import typing
+from itertools import chain
 from operator import itemgetter
 from typing import cast, Dict, Iterable, Set, Tuple
 
-from waterloo.types import ImportsForTypes, TypeAtom, Types, TypeSignature
+from waterloo.types import (
+    ImportsForTypes,
+    SourcePos,
+    TypeAtom,
+    Types,
+    TypeSignature,
+)
 
 
 def _join_type_atoms(type_atoms: Iterable[TypeAtom]) -> str:
@@ -32,8 +39,8 @@ def get_type_comment(signature: TypeSignature) -> str:
         # then we should emit a warning here instead of this which
         # is like an implicit `Any` for all args
         args = Types.ELLIPSIS
-    if signature.returns and signature.returns.type:
-        returns = signature.returns.type.to_annotation()
+    if signature.returns and signature.returns.type_def:
+        returns = signature.returns.type_def.to_annotation()
     else:
         # TODO:
         # this is a reasonable default but it should be a configurable error
@@ -98,7 +105,7 @@ def get_import_lines(type_names: Set[str]) -> ImportsForTypes:
 
     dotted_paths = {name for name in type_names if _is_dotted_path(name)}
     type_names -= dotted_paths
-    # assume remaining type_names are definied in the file or already imported
+    # assume remaining type_names are defined in the file or already imported
 
     import_tuples = [
         ('typing', name)
@@ -116,3 +123,20 @@ def get_import_lines(type_names: Set[str]) -> ImportsForTypes:
         imports=imports_dict,
         unimported=type_names,
     )
+
+
+def slice_by_pos(val: str, start: SourcePos, end: SourcePos) -> str:
+    if "\n" in val:
+        lines = val.split("\n")
+        if start.row < end.row:
+            top = lines[start.row][start.col:]
+            filling = lines[start.row + 1: end.row]
+            bottom = lines[end.row][:end.col]
+            return "\n".join(
+                line for line in chain([top], filling, [bottom])
+            )
+        else:
+            return lines[start.row][start.col:end.col]
+    else:
+        return val[start.col:end.col]
+

@@ -133,7 +133,6 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     _record_type_names(filename, signature.type_names())
 
     # add the type comment as first line of func body (before docstring)
-    # TODO: convert dotted-path types to bare name
     type_comment = get_type_comment(signature)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     return node

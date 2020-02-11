@@ -2,7 +2,8 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import cast, Dict, Iterable, NamedTuple, Optional, Set, Union
+from typing import cast, Dict, Iterable, NamedTuple, Optional, Set, Tuple, Union
+from typing_extensions import Protocol
 
 
 class ArgsSection(str, Enum):
@@ -56,6 +57,18 @@ def _repr_type_arg(
         raise TypeError(arg)
 
 
+class TypeAtomic(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def args(self) -> Iterable['TypeAtomic']: ...
+
+    def to_annotation(self, fix_dotted_paths=True) -> str: ...
+
+    def type_names(self) -> Set[str]: ...
+
+
 class TypeAtom(NamedTuple):
     name: str
     args: Iterable['TypeAtom']  # type: ignore[misc]
@@ -72,7 +85,7 @@ class TypeAtom(NamedTuple):
         """
         TODO:
         should Callable args list be a TypeAtom with name=None?
-        (yes I think so)
+        (...yes I think so)
         """
         names = set()
         names.add(self.name)
@@ -85,14 +98,67 @@ class TypeAtom(NamedTuple):
         return names
 
 
-@dataclass
+class SourcePos(NamedTuple):
+    row: int
+    col: int
+
+    def __add__(self, other):
+        return SourcePos(
+            self[0] + other[0],
+            self[1] + other[1],
+        )
+
+    def __sub__(self, other):
+        return SourcePos(
+            self[0] - other[0],
+            self[1] - other[1],
+        )
+
+
+class TypeDef(NamedTuple):
+    start_pos: SourcePos
+    type_atom: TypeAtom
+    end_pos: SourcePos
+
+    @classmethod
+    def from_tuples(
+        cls,
+        start_pos: Tuple[int, int],
+        type_atom: Tuple[str, Iterable[TypeAtom]],
+        end_pos: Tuple[int, int],
+    ) -> 'TypeDef':
+        return cls(
+            SourcePos(*start_pos),
+            TypeAtom(*type_atom),
+            SourcePos(*end_pos),
+        )
+
+    @property
+    def name(self) -> str:
+        return self.type_atom.name
+
+    @property
+    def args(self) -> Iterable[TypeAtom]:
+        return self.type_atom.args
+
+    def to_annotation(self, fix_dotted_paths=True) -> str:
+        return self.type_atom.to_annotation(fix_dotted_paths)
+
+    def type_names(self) -> Set[str]:
+        return self.type_atom.type_names()
+
+
+@dataclass(frozen=True)
 class ArgTypes:
     name: ArgsSection
-    args: OrderedDict[str, Optional[TypeAtom]]
+    args: OrderedDict[str, Optional[TypeDef]]
 
-    is_fully_typed: bool = field(init=False)
+    is_fully_typed: bool
 
-    def __post_init__(self):
+    @classmethod
+    def factory(
+        cls, name: ArgsSection, args: OrderedDict[str, Optional[TypeDef]]
+    ) -> 'ArgTypes':
         """
         We need all args to have a type, otherwise we can't output a valid
         py2 type comment.
@@ -106,8 +172,13 @@ class ArgTypes:
         to format...
         (in both cases these args will be treated as implicit `Any` by mypy)
         """
-        self.is_fully_typed = all(
-            arg is not None for arg in self.args.values()
+        is_fully_typed = all(
+            arg is not None for arg in args.values()
+        )
+        return cls(
+            name=name,
+            args=args,
+            is_fully_typed=is_fully_typed,
         )
 
     def type_names(self) -> Set[str]:
@@ -118,46 +189,63 @@ class ArgTypes:
         return names
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReturnType:
     name: ReturnsSection
-    type: Optional[TypeAtom]
+    type_def: Optional[TypeDef]
 
-    is_fully_typed: bool = field(init=False)
+    is_fully_typed: bool
 
-    def __post_init__(self):
+    @classmethod
+    def factory(
+        cls, name: ReturnsSection, type_def: Optional[TypeDef]
+    ) -> 'ReturnType':
         """
         (I'm not sure our parser would ever return a `ReturnType` with no
-        `type` so this is likely always `True`)
+        `type_atom` so this is likely always `True`)
         """
-        self.is_fully_typed = self.type is not None
+        is_fully_typed = type_def is not None
+        return cls(
+            name=name,
+            type_def=type_def,
+            is_fully_typed=is_fully_typed,
+        )
 
     def type_names(self) -> Set[str]:
-        if self.type:
-            return self.type.type_names()
+        if self.type_def:
+            return self.type_def.type_names()
         return set()
 
 
-@dataclass
+@dataclass(frozen=True)
 class TypeSignature:
     args: Optional[ArgTypes]
     returns: Optional[ReturnType]
 
-    has_types: bool = field(init=False)
-    is_fully_typed: bool = field(init=False)
+    has_types: bool
+    is_fully_typed: bool
 
-    def __post_init__(self):
+    @classmethod
+    def factory(
+        cls, args: Optional[ArgTypes], returns: Optional[ReturnType]
+    ) -> 'TypeSignature':
         """
-        If `self.returns is None` we can (optionally) assume the signature
-        should be `-> None`. For everything else we require `is_fully_typed`.
+        If `returns is None` we can (optionally) assume the signature should
+        be `-> None`. For everything else we require `is_fully_typed`.
         """
-        self.has_types = self.args or self.returns
-        self.is_fully_typed = (
-            self.args and self.args.is_fully_typed
+        has_types = bool(args or returns)
+        is_fully_typed = bool(
+            args and args.is_fully_typed
             and (
-                self.returns is None
-                or self.returns.is_fully_typed
+                returns is None
+                or returns.is_fully_typed
             )
+        )
+        return cls(
+            args=args,
+            returns=returns,
+            has_types=has_types,
+            is_fully_typed=is_fully_typed,
         )
 
     def type_names(self) -> Set[str]:

@@ -26,7 +26,7 @@ setup(
 
     description=(
         "Tool to convert 'typed docstrings' (e.g. Sphinx 'Napoleon' "
-        "format) to PEP-484 Py3 type annotations or Py2 type comments."
+        "format) to PEP-484 Py2 type comments."
     ),
     long_description=long_description,
 
@@ -50,6 +50,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Topic :: Text Processing',
     ],
+    python_requires='~=3.6',
     install_requires=[
         'megaparsy',
         'bowler',
