@@ -10,7 +10,7 @@ pdbpp = "*"
 twine = "*"
 pytest = "*"
 hypothesis = "*"
-mypy = "*"
+mypy = "==0.711"  # newer versions (<= 0.761) have even less support for recursive types
 
 [packages]
 megaparsy = {git = "https://github.com/anentropic/megaparsy"}
