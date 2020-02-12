@@ -1,13 +1,16 @@
-from typing import Any, Tuple
+from typing import Any, Generator, Tuple
 
 import parsy
 
 from waterloo.types import SourcePos
 
 
+TypedMarkReturnT = Tuple[SourcePos, Any, SourcePos]
+
+
 def typed_mark(p: parsy.Parser, factory=lambda *args: args):
     @parsy.generate
-    def marked() -> Tuple[SourcePos, Any, SourcePos]:
+    def marked() -> Generator[parsy.Parser, parsy.Parser, TypedMarkReturnT]:
         start = SourcePos(*(yield parsy.line_info))
         body = yield p
         end = SourcePos(*(yield parsy.line_info))

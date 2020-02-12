@@ -241,7 +241,7 @@ class WaterlooQuery(Query):
 
     See https://github.com/jreese/fissix/blob/master/fissix/fixer_base.py
     """
-    raw_fixers: List[BaseFix]
+    raw_fixers: List[Type[BaseFix]]
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

@@ -99,6 +99,8 @@ ENV/
 
 # mypy
 .mypy_cache/
+# pyre
+.pyre/
 
 # training
 training/data/images

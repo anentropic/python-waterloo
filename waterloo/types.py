@@ -78,7 +78,7 @@ class TypeAtomic(Protocol):
     def type_names(self) -> Set[str]: ...
 
 
-class TypeAtom(NamedTuple):
+class TypeAtom(NamedTuple):  # type: ignore[misc]
     name: str
     args: Iterable['TypeAtom']
 
@@ -124,7 +124,7 @@ class SourcePos(NamedTuple):
         )
 
 
-class TypeDef(NamedTuple):
+class TypeDef(NamedTuple):  # type: ignore[misc]
     start_pos: SourcePos
     type_atom: TypeAtom
     end_pos: SourcePos

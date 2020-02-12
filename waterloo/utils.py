@@ -60,7 +60,7 @@ BUILTIN_TYPE_NAMES = {
 TYPING_TYPE_NAMES = {
     name
     for name in dir(typing)
-    if isinstance(
+    if isinstance(  # type: ignore
         getattr(typing, name),
         (
             typing._GenericAlias,  # type: ignore[attr-defined,arg-type]

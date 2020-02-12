@@ -1,0 +1,13 @@
+{
+  "binary": "/Users/paul/.virtualenvs/waterloo-sHXra0II/bin/pyre.bin",
+  "source_directories": [
+    ".",
+    "/Users/paul/.virtualenvs/waterloo-sHXra0II/lib/python3.7/site-packages/"
+  ],
+  "exclude": [
+  	"/Users/paul/Documents/Dev/Personal/waterloo/tests/.*"
+  ],
+  "taint_models_path": "/Users/paul/.virtualenvs/waterloo-sHXra0II/lib/pyre_check/taint/",
+  "typeshed": "/Users/paul/.virtualenvs/waterloo-sHXra0II/lib/pyre_check/typeshed/",
+  "search_path": "/Users/paul/Documents/Dev/Personal/waterloo/waterloo"
+}

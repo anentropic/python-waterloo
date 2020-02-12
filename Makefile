@@ -14,7 +14,7 @@ shell:
 	PYTHONPATH=waterloo:tests:$$PYTHONPATH ipython
 
 mypy:
-	mypy --ignore-missing-imports --show-error-codes waterloo
+	mypy --ignore-missing-imports waterloo
 
 pytest:
 	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/
