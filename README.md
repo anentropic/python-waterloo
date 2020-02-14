@@ -11,7 +11,7 @@
 
 (Work In Progress: not yet released to PyPI)
 
-A cli tool to convert type annotations found in 'Google-style' docstrings (as understood by e.g. [`sphinx.ext.napoleon`](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/)) into PEP-484 type comments which can be checked statically using `mypy --py2`.
+A cli tool to convert type annotations found in 'Google-style' docstrings (as understood and documented by the [Sphinx Napoleon](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/) plugin) into PEP-484 type comments which can be checked statically using `mypy --py2`.
 
 For an example of the format see https://github.com/anentropic/python-waterloo/blob/master/tests/fixtures/napoleon.py
 
