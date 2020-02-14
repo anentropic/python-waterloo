@@ -1,13 +1,14 @@
 # Waterloo
 
+![Waterloo](https://user-images.githubusercontent.com/147840/74556780-b1621b80-4f56-11ea-9b4a-6d34da996cd8.jpg)
+
 [![Build Status](https://travis-ci.org/anentropic/python-waterloo.svg?branch=master)](https://travis-ci.org/anentropic/python-waterloo)
 [![Latest PyPI version](https://badge.fury.io/py/waterloo.svg)](https://pypi.python.org/pypi/waterloo/)
 
 ![Python 3.6](https://img.shields.io/badge/Python%203.6--brightgreen.svg)
 ![Python 3.7](https://img.shields.io/badge/Python%203.7--brightgreen.svg)
-![Python 3.8](https://img.shields.io/badge/Python%203.8--brightgreen.svg)
-
-![waterloo](https://user-images.githubusercontent.com/147840/74556780-b1621b80-4f56-11ea-9b4a-6d34da996cd8.jpg)
+![Python 3.8](https://img.shields.io/badge/Python%203.8--brightgreen.svg)  
+(...but for running on Python 2.7 code)
 
 (Work In Progress: not yet released to PyPI)
 
