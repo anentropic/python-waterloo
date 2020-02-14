@@ -59,6 +59,7 @@ setup(
 
     packages=[
         'waterloo',
+        'waterloo.annotator',
         'waterloo.parsers',
     ],
 

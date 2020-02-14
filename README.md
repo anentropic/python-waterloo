@@ -17,7 +17,7 @@ After we parse the docstrings and prepare the type comments (and imports of ment
 
 In short you can...
 ```
-waterloo my-project-dir/ --write --silent
+waterloo my-project-dir/ --write
 ```
 ...and it will derive type comments from all of your typed docstrings and add them to the files.
 

@@ -44,7 +44,7 @@ def main():
         help='whether to apply the changes to target files',
     )
     parser.add_argument(
-        '-s', '--silent', action='store_true', default=False,
+        '-s', '--show-diff', action='store_true', default=False,
         help='whether to print the hunk diffs to be applied',
     )
 
@@ -56,5 +56,5 @@ def main():
         max_indent_level=args.max_indent_level,
         interactive=args.interactive,
         write=args.write,
-        silent=args.silent,
+        silent=not args.show_diff,
     )

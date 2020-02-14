@@ -1,6 +1,6 @@
 import re
 from threading import local
-from typing import cast, List, Optional, Set, Sequence, Type
+from typing import List, Optional, Sequence, Type
 
 from bowler import Capture, Filename, LN, Query
 from fissix.fixer_base import BaseFix
@@ -10,7 +10,11 @@ from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.utils import get_type_comment, get_import_lines, StylePrinter
+from waterloo.annotator.utils import get_type_comment, get_import_lines
+from waterloo.utils import StylePrinter
+
+
+echo = StylePrinter()
 
 
 IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
@@ -18,7 +22,19 @@ IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
 threadlocals = local()  # used in bowler subprocesses only
 
 
-echo = StylePrinter()
+def _init_threadlocals():
+    global threadlocals
+    threadlocals.type_names = set()
+    threadlocals.comment_count = 0
+
+
+def _cleanup_threadlocals():
+    global threadlocals
+    try:
+        del threadlocals.type_names
+        del threadlocals.comment_count
+    except AttributeError:
+        pass
 
 
 class NonMatchingFixer(BaseFix):
@@ -38,38 +54,19 @@ class NonMatchingFixer(BaseFix):
 class StartFile(NonMatchingFixer):
     def start_tree(self, tree: Node, filename: str) -> None:
         echo.info(f"<b>{filename}</b>")
+        _init_threadlocals()
 
 
 class EndFile(NonMatchingFixer):
     def finish_tree(self, tree: Node, filename: str) -> None:
-        if threadlocals.type_names.get(filename):
-            echo.info("-> type comments added 🎉")
+        if threadlocals.comment_count:
+            echo.info(
+                f"-> <b>{threadlocals.comment_count}</b> type comments added 🎉"
+            )
         else:
             echo.info("(no docstring types found)")
         echo.info("")
-
-
-def _get_type_names(filename: Filename) -> Set[str]:
-    try:
-        type_names = threadlocals.type_names
-    except AttributeError:
-        type_names = threadlocals.type_names = {}
-    f_type_names = type_names.setdefault(filename, set())
-    return f_type_names
-
-
-def _record_type_names(filename: Filename, new_type_names: Set[str]) -> None:
-    """
-    NOTE:
-    Bowler runs everything under multiprocessing, passing each file to be
-    refactored into one of its pool of processes. As we have no other way of
-    communicating between steps of the process or collating metadata we will
-    just use a threadlocal var - this should be the same instance for all code
-    involved in processing a particular file.
-    """
-    type_names = _get_type_names(filename)
-    type_names |= new_type_names
-    threadlocals.type_names[filename] = type_names
+        _cleanup_threadlocals()
 
 
 def f_not_already_annotated_py2(
@@ -124,18 +121,19 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
         return node
 
     if not signature.is_fully_typed:
-        function_name = capture['function_name'].value
+        function = capture['function_name']
         echo.warning(
-            f"⚠️  Docstring for <b>{function_name}</b> did"
-            f" not fully specify args and return types. Check the generated"
-            f" annotation 👀"
+            f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b>"
+            f" did not fully specify args and return types.\n"
+            f"   Please edit the generated annotation manually 👀"
         )
 
-    _record_type_names(filename, signature.type_names())
+    threadlocals.type_names |= signature.type_names()
 
     # add the type comment as first line of func body (before docstring)
     type_comment = get_type_comment(signature)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
+    threadlocals.comment_count += 1
     return node
 
 
@@ -211,8 +209,7 @@ class AddTypeImports(NonMatchingFixer):
     """
 
     def finish_tree(self, tree: Node, filename: str) -> None:
-        type_names = _get_type_names(cast(Filename, filename))
-        imports_dict, unimported = get_import_lines(type_names)
+        imports_dict, unimported = get_import_lines(threadlocals.type_names)
         if unimported:
             echo.warning(
                 "⚠️  Could not determine imports for these types: {}\n"
