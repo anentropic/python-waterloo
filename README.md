@@ -7,6 +7,8 @@
 ![Python 3.7](https://img.shields.io/badge/Python%203.7--brightgreen.svg)
 ![Python 3.8](https://img.shields.io/badge/Python%203.8--brightgreen.svg)
 
+![waterloo](https://user-images.githubusercontent.com/147840/74556780-b1621b80-4f56-11ea-9b4a-6d34da996cd8.jpg)
+
 (Work In Progress: not yet released to PyPI)
 
 A cli tool to convert type annotations found in 'Google-style' docstrings (as understood by e.g. [`sphinx.ext.napoleon`](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/)) into PEP-484 type comments which can be checked statically using `mypy --py2`.
