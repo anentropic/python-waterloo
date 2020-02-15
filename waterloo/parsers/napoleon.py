@@ -243,8 +243,8 @@ ignored_line = (
 # THE PARSER
 docstring_parser: parsy.Parser = (
     parsy.seq(
-        args=(ignored_line.many() >> p_arg_list).optional(),
-        returns=(ignored_line.many() >> p_returns_block).optional(),
+        arg_types=(ignored_line.many() >> p_arg_list).optional(),
+        return_type=(ignored_line.many() >> p_returns_block).optional(),
     ).combine_dict(
         TypeSignature.factory
     )

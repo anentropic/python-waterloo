@@ -10,7 +10,11 @@ from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.annotator.utils import get_type_comment, get_import_lines
+from waterloo.annotator.utils import (
+    get_type_comment,
+    get_import_lines,
+    remove_types,
+)
 from waterloo.utils import StylePrinter
 
 
@@ -100,7 +104,7 @@ def f_has_docstring(node: LN, capture: Capture, filename: Filename) -> bool:
         result = bool(IS_DOCSTRING_RE.search(docstring_node.value))
     except (AttributeError, IndexError):
         return False
-    capture['docstring'] = docstring_node.value
+    capture['docstring_node'] = docstring_node
     return result
 
 
@@ -116,7 +120,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     initial_indent = capture['initial_indent_node'][0]
 
     # TODO: error handling
-    signature = docstring_parser.parse(capture['docstring'])
+    signature = docstring_parser.parse(capture['docstring_node'].value)
     if not signature.has_types:
         return node
 
@@ -134,6 +138,14 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     type_comment = get_type_comment(signature)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     threadlocals.comment_count += 1
+
+    new_docstring_node = capture['docstring_node'].clone()
+    new_docstring_node.value = remove_types(
+        docstring=capture['docstring_node'].value,
+        signature=signature,
+    )
+    capture['docstring_node'].replace(new_docstring_node)
+
     return node
 
 

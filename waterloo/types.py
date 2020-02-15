@@ -228,41 +228,41 @@ class ReturnType:
 
 @dataclass(frozen=True)
 class TypeSignature:
-    args: Optional[ArgTypes]
-    returns: Optional[ReturnType]
+    arg_types: Optional[ArgTypes]
+    return_type: Optional[ReturnType]
 
     has_types: bool
     is_fully_typed: bool
 
     @classmethod
     def factory(
-        cls, args: Optional[ArgTypes], returns: Optional[ReturnType]
+        cls, arg_types: Optional[ArgTypes], return_type: Optional[ReturnType]
     ) -> 'TypeSignature':
         """
-        If `returns is None` we can (optionally) assume the signature should
-        be `-> None`. For everything else we require `is_fully_typed`.
+        If `return_type is None` we can (optionally) assume the signature
+        should be `-> None`. For everything else we require `is_fully_typed`.
         """
-        has_types = bool(args or returns)
+        has_types = bool(arg_types or return_type)
         is_fully_typed = bool(
-            args and args.is_fully_typed
+            arg_types and arg_types.is_fully_typed
             and (
-                returns is None
-                or returns.is_fully_typed
+                return_type is None
+                or return_type.is_fully_typed
             )
         )
         return cls(
-            args=args,
-            returns=returns,
+            arg_types=arg_types,
+            return_type=return_type,
             has_types=has_types,
             is_fully_typed=is_fully_typed,
         )
 
     def type_names(self) -> Set[str]:
         names: Set[str] = set()
-        if self.args:
-            names |= self.args.type_names()
-        if self.returns:
-            names |= self.returns.type_names()
+        if self.arg_types:
+            names |= self.arg_types.type_names()
+        if self.return_type:
+            names |= self.return_type.type_names()
         return names
 
 

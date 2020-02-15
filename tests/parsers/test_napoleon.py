@@ -271,7 +271,7 @@ def test_docstring_parser():
                 (False if timed out)
         """
     expected = TypeSignature.factory(
-        args=ArgTypes.factory(
+        arg_types=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
                 ('key',
@@ -300,7 +300,7 @@ def test_docstring_parser():
                  )),
             ]),
         ),
-        returns=ReturnType.factory(
+        return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeDef.from_tuples(
                 (13, 12),
@@ -335,7 +335,7 @@ def test_docstring_parser2():
             ]
         """
     expected = TypeSignature.factory(
-        args=ArgTypes.factory(
+        arg_types=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
                 ('key',
@@ -364,7 +364,7 @@ def test_docstring_parser2():
                  )),
             ]),
         ),
-        returns=ReturnType.factory(
+        return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeDef.from_tuples(
                 (13, 12),
@@ -392,8 +392,8 @@ def test_docstring_parser_no_annotations():
             (False if timed out)
         """
     expected = TypeSignature.factory(
-        args=None,
-        returns=None,
+        arg_types=None,
+        return_type=None,
     )
 
     result = docstring_parser.parse(example)

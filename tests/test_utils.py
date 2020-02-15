@@ -16,7 +16,7 @@ from waterloo.utils import get_type_comment
 @pytest.mark.parametrize('example,expected', [
     (
         TypeSignature.factory(
-            args=ArgTypes.factory(
+            arg_types=ArgTypes.factory(
                 name=ArgsSection.ARGS,
                 args=OrderedDict([
                     ('key', TypeAtom('str', [])),
@@ -26,7 +26,7 @@ from waterloo.utils import get_type_comment
                      TypeAtom('Optional', [TypeAtom('float', [])])),
                 ])
             ),
-            returns=ReturnType.factory(
+            return_type=ReturnType.factory(
                 name=ReturnsSection.RETURNS,
                 type_def=TypeAtom('bool', []),
             ),
@@ -35,7 +35,7 @@ from waterloo.utils import get_type_comment
     ),
     (
         TypeSignature.factory(
-            args=ArgTypes.factory(
+            arg_types=ArgTypes.factory(
                 name=ArgsSection.ARGS,
                 args=OrderedDict([
                     ('key', TypeAtom('str', [])),
@@ -45,7 +45,7 @@ from waterloo.utils import get_type_comment
                      TypeAtom('Optional', [TypeAtom('float', [])])),
                 ])
             ),
-            returns=ReturnType.factory(
+            return_type=ReturnType.factory(
                 name=ReturnsSection.RETURNS,
                 type_def=TypeAtom("Tuple", [
                     TypeAtom("int", []),
