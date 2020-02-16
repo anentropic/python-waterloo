@@ -24,7 +24,7 @@ from waterloo.types import (
     TypeDef,
     TypeSignature,
 )
-from waterloo.utils import slice_by_pos
+from waterloo.annotator.utils import slice_by_pos
 
 """
 Manually-constructed test-cases for the parsers

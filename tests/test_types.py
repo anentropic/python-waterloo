@@ -183,7 +183,7 @@ def test_return_type_type_names(expected, example):
 @pytest.mark.parametrize('expected,example', [
     (set(),
      TypeSignature.factory(
-        args=None,
+        arg_types=None,
         return_type=None
      )),
     ({"str", "datetime"},

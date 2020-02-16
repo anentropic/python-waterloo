@@ -10,7 +10,7 @@ from waterloo.types import (
     TypeAtom,
     TypeSignature,
 )
-from waterloo.utils import get_type_comment
+from waterloo.annotator.utils import get_type_comment
 
 
 @pytest.mark.parametrize('example,expected', [
