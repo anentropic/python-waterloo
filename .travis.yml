@@ -4,7 +4,6 @@ dist: xenial
 # ---
 language: python
 python:
-  - "3.6"
   - "3.7"
   - "3.8"
 install:
@@ -14,5 +13,5 @@ install:
   - pip install .
   # (note: pytest already available in travis, breaks if we install our own)
 script:
-  - mypy --ignore-missing-imports --show-error-codes waterloo
+  - mypy --ignore-missing-imports waterloo
   - pytest tests/

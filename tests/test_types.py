@@ -183,24 +183,24 @@ def test_return_type_type_names(expected, example):
 @pytest.mark.parametrize('expected,example', [
     (set(),
      TypeSignature.factory(
-        args=None,
-        returns=None
+        arg_types=None,
+        return_type=None
      )),
     ({"str", "datetime"},
      TypeSignature.factory(
-        args=ArgTypes.factory(
+        arg_types=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
                 ('a', TypeAtom("str", [])),
                 ('b', TypeAtom("datetime", [])),
             ]),
         ),
-        returns=None
+        return_type=None
      )),
     ({"Dict", "int", "str"},
      TypeSignature.factory(
-        args=None,
-        returns=ReturnType.factory(
+        arg_types=None,
+        return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeAtom("Dict", [
                 TypeAtom("int", []), TypeAtom("str", [])
@@ -209,14 +209,14 @@ def test_return_type_type_names(expected, example):
      )),
     ({"Dict", "int", "str", "datetime"},
      TypeSignature.factory(
-        args=ArgTypes.factory(
+        arg_types=ArgTypes.factory(
             name=ArgsSection.ARGS,
             args=OrderedDict([
                 ('a', TypeAtom("str", [])),
                 ('b', TypeAtom("datetime", [])),
             ]),
         ),
-        returns=ReturnType.factory(
+        return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeAtom("Dict", [
                 TypeAtom("int", []), TypeAtom("str", [])

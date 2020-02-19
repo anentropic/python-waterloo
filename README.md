@@ -5,7 +5,6 @@
 [![Build Status](https://travis-ci.org/anentropic/python-waterloo.svg?branch=master)](https://travis-ci.org/anentropic/python-waterloo)
 [![Latest PyPI version](https://badge.fury.io/py/waterloo.svg)](https://pypi.python.org/pypi/waterloo/)
 
-![Python 3.6](https://img.shields.io/badge/Python%203.6--brightgreen.svg)
 ![Python 3.7](https://img.shields.io/badge/Python%203.7--brightgreen.svg)
 ![Python 3.8](https://img.shields.io/badge/Python%203.8--brightgreen.svg)  
 (...but for running on Python 2.7 code)

@@ -50,7 +50,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Topic :: Text Processing',
     ],
-    python_requires='~=3.6',
+    python_requires='~=3.7',
     install_requires=[
         'megaparsy>=0.1.4,<0.2.0',
         'bowler>=0.8.0,<0.9.0',
