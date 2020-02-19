@@ -179,17 +179,36 @@ def _remove_type_def(
 
     _pre = start_pos.row
     _post = end_pos.row + 1
-    if role is TypeDefRole.RETURN and replaced_line.strip() == "":
-        # if the return type had no description, remove the section header
-        # and any preceding blank lines too
-        # NOTE: relies on current parser allows no lines between head + body
-        _pre -= 1
-        while _pre > 0 and lines[_pre - 1].strip() == "":
+
+    def has_return_description():
+        # TODO: this would be easier if the parser captured a full AST...
+        return (
+            replaced_line.strip()
+            or (lines[_post:]
+                and lines[_post].startswith(prefix)  # is indented (else not part of returns section)
+                and lines[_post].strip())
+        )
+
+    if role is TypeDefRole.RETURN:
+        if not has_return_description():
+            # if the return type had no description, remove the section header and
+            # empty return type line, plus any preceding blank lines before header
+            # NOTE: relies on current parser allows no lines between head + body
             _pre -= 1
+            while _pre > 0 and lines[_pre - 1].strip() == "":
+                _pre -= 1
+            segments = [lines[:_pre], lines[_post:]]
+        else:
+            if replaced_line.strip():
+                segments = [lines[:_pre], [replaced_line], lines[_post:]]
+            else:
+                segments = [lines[:_pre], lines[_post:]]
+    else:
+        segments = [lines[:_pre], [replaced_line], lines[_post:]]
 
     return [
         line
-        for line in chain(lines[:_pre], [replaced_line], lines[_post:])
+        for line in chain.from_iterable(segments)
     ]
 
 

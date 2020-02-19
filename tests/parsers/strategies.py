@@ -268,6 +268,7 @@ def napoleon_type_annotation_f(draw):
 
 
 rest_of_line = strip_whitespace_f(min_size=0, max_size=80)
+rest_of_line_nonempty = strip_whitespace_f(min_size=1, max_size=80)
 
 
 @st.composite
@@ -319,6 +320,7 @@ def annotated_arg_f(draw):
             'trailer': trailer,
             'start_pos': start_pos,
             'end_pos': end_pos,
+            'example_no_type': f"{arg_name}{trailer}"
         }
     )
 
@@ -336,7 +338,7 @@ def rest_of_line_with_insertion_f(draw):
 
 
 ignored_line = st.one_of(
-    rest_of_line,
+    rest_of_line_nonempty,
     rest_of_line_with_insertion_f(),
 )
 
@@ -344,7 +346,7 @@ ignored_line = st.one_of(
 @st.composite
 def annotated_arg_full_f(draw, initial_indent, indent, row_offset=0):
     first_line, arg_context = draw(annotated_arg_f())
-    wrapped_lines = draw(small_lists_f(rest_of_line))
+    wrapped_lines = draw(small_lists_f(rest_of_line_nonempty))
 
     offset = SourcePos(row_offset, len(initial_indent) + len(indent))
     arg_context['start_pos'] += offset
@@ -355,11 +357,18 @@ def annotated_arg_full_f(draw, initial_indent, indent, row_offset=0):
             f"{initial_indent}{indent*2}{indent}{line}"
             for line in wrapped_lines
         )
+        arg_context['example_no_type'] = (
+            f"{initial_indent}{indent}{arg_context['example_no_type']}\n"
+            f"{continuation}\n"
+        )
         return Example(
             f"{initial_indent}{indent}{first_line}\n{continuation}\n",
             arg_context
         )
     else:
+        arg_context['example_no_type'] = (
+            f"{initial_indent}{indent}{arg_context['example_no_type']}\n"
+        )
         return Example(
             f"{initial_indent}{indent}{first_line}\n",
             arg_context
@@ -390,11 +399,17 @@ def args_section_f(draw, initial_indent=None, row_offset=0):
         )
     )
     args_str = "\n".join(arg[0] for arg in annotated_args)
+
+    args_str_no_types = "\n".join(
+        arg.context['example_no_type']
+        for arg in annotated_args
+    )
     return Example(
         f"{initial_indent}{args_head}{args_str}",
         {
             'args_head': args_head,
             'annotated_args': annotated_args,
+            'example_no_type': f"{initial_indent}{args_head}{args_str_no_types}",
         }
     )
 
@@ -424,14 +439,19 @@ def annotated_return_f(draw):
             'trailer': trailer,
             'start_pos': start_pos,
             'end_pos': end_pos,
+            'example_no_type': f"{trailer.lstrip(':').lstrip()}"
         }
     )
 
 
 @st.composite
 def annotated_return_full_f(draw, initial_indent, indent, row_offset=0):
+    """
+    Adds indent prefix and wrap-around continuation lines suffix to
+    `annotated_return_f`
+    """
     first_line, context = draw(annotated_return_f())
-    wrapped_lines = draw(small_lists_f(rest_of_line))
+    wrapped_lines = draw(small_lists_f(rest_of_line_nonempty))
 
     offset = SourcePos(row_offset, len(initial_indent) + len(indent))
     context['start_pos'] += offset
@@ -442,11 +462,25 @@ def annotated_return_full_f(draw, initial_indent, indent, row_offset=0):
             f"{initial_indent}{indent*2}{indent}{line}"
             for line in wrapped_lines
         )
+        if context['example_no_type']:
+            context['example_no_type'] = (
+                f"{initial_indent}{indent}{context['example_no_type']}\n"
+                f"{continuation}\n"
+            )
+        else:
+            # if the type-stripped line is empty, omit it, leaving only
+            # the continuation
+            context['example_no_type'] = f"{continuation}\n"
+        context['continuation'] = continuation
         return Example(
             f"{initial_indent}{indent}{first_line}\n{continuation}\n",
             context
         )
     else:
+        context['example_no_type'] = (
+            f"{initial_indent}{indent}{context['example_no_type']}\n"
+        )
+        context['continuation'] = ''
         return Example(
             f"{initial_indent}{indent}{first_line}\n",
             context
@@ -474,11 +508,20 @@ def returns_section_f(draw, initial_indent=None, row_offset=0):
         )
     )
 
+    # if return section has no description then it will be empty
+    # after types are stripped, so whole section should be omitted
+    if annotated_return.context['example_no_type'].strip():
+        no_type_str = annotated_return.context['example_no_type']
+        example_no_type = f"{initial_indent}{returns_head}{no_type_str}"
+    else:
+        example_no_type = ''
+
     return Example(
-        f"{initial_indent}{returns_head}{annotated_return[0]}",
+        f"{initial_indent}{returns_head}{annotated_return.example}",
         {
             'returns_head': returns_head,
             'annotated_return': annotated_return,
+            'example_no_type': example_no_type,
         }
     )
 
@@ -489,32 +532,32 @@ def napoleon_docstring_f(draw):
 
     _intro_lines = draw(small_lists_f(ignored_line))
     intro = "\n".join(_intro_lines)
-    # last ignored_line has no trailing \n
-    gap_1 = draw(st.text('\n', min_size=1, max_size=3)) if intro else ''
+    # last intro has no trailing \n
+    gap_1 = draw(st.text('\n', min_size=1, max_size=3))
 
     row_offset = len(_intro_lines) + len(gap_1)
     args_section = draw(
         st.one_of(
             args_section_f(initial_indent, row_offset=row_offset),
-            st.just(Example('', {}))
+            st.just(Example('', {'example_no_type': ''}))
         )
     )
     gap_2 = (
         draw(st.text('\n', min_size=0, max_size=2))
-        if args_section[0]
+        if args_section.example
         else ''
     )
 
-    row_offset += len(args_section[0].split("\n")) + len(gap_2)
+    row_offset += len(args_section.example.split("\n")) + len(gap_2)
     returns_section = draw(
         st.one_of(
             returns_section_f(initial_indent, row_offset=row_offset),
-            st.just(Example('', {}))
+            st.just(Example('', {'example_no_type': ''}))
         )
     )
     gap_3 = (
         draw(st.text('\n', min_size=0, max_size=2))
-        if returns_section[0]
+        if returns_section.example
         else ''
     )
 
@@ -525,16 +568,40 @@ def napoleon_docstring_f(draw):
     example = (
         f"{intro}"
         f"{gap_1}"
-        f"{args_section[0]}"
+        f"{args_section.example}"
         f"{gap_2}"
-        f"{returns_section[0]}"
+        f"{returns_section.example}"
         f"{gap_3}"
         f"{following}"
     )
+
+    gap_1_nt = gap_1
+    gap_2_nt = gap_2
+    returns_section_no_type = returns_section.context['example_no_type']
+    if returns_section.example and not returns_section_no_type:
+        if not args_section.example:
+            gap_1_nt = '\n' if intro else ''  # collapsed by `_remove_type_def`
+        gap_2_nt = ''
+    example_no_type = (
+        f"{intro}"
+        f"{gap_1_nt}"
+        f"{args_section.context['example_no_type']}"
+        f"{gap_2_nt}"
+        f"{returns_section_no_type}"
+        f"{gap_3}"
+        f"{following}"
+    )
+
     return Example(
         example=example,
         context={
             'args_section': args_section,
             'returns_section': returns_section,
+            'example_no_type': example_no_type,
+            'intro': intro,
+            'gap_1': gap_1,
+            'gap_2': gap_2,
+            'gap_3': gap_3,
+            'following': following,
         }
     )
