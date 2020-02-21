@@ -45,6 +45,14 @@ def main():
         "is set we will instead output an annotation like `(...) -> returnT` "
         "which mypy will treat as if all args are `Any`."
     )
+    annotation_group.add_argument(
+        '-rr', '--require-return-type', action='store_true', default=False,
+        help="If any args or return types are found in docstring we can "
+        "attempt to output a type annotation. If the return type is missing "
+        "our default behaviour is to assume function should be annotated as "
+        "returning `-> None`. If this flag is set we will instead raise an "
+        "error."
+    )
 
     apply_group = parser.add_argument_group('apply options')
     apply_group.add_argument(
@@ -71,6 +79,7 @@ def main():
     settings.INDENT = indent
     settings.MAX_INDENT_LEVEL = args.max_indent_level
     settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
+    settings.REQUIRE_RETURN_TYPE = args.require_return_type
 
     annotate(
         *args.files,

@@ -7,6 +7,7 @@ class Config(t.Schema):
     MAX_INDENT_LEVEL = t.Integer(default=10)
 
     ALLOW_UNTYPED_ARGS = t.Boolean(default=False)
+    REQUIRE_RETURN_TYPE = t.Boolean(default=False)
 
     ECHO_STYLES = t.Object(
         properties=t.String(),

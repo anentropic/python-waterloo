@@ -142,10 +142,17 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
             )
 
     if not signature.return_type or not signature.return_type.is_fully_typed:
-        echo.warning(
-            f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
-            f"   -> return annotated as <b>-> None</b>"
-        )
+        if settings.REQUIRE_RETURN_TYPE:
+            echo.error(
+                f"🛑 <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
+                f"   (no type annotation added)"
+            )
+            raise Interrupt
+        else:
+            echo.warning(
+                f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
+                f"   -> return annotated as <b>-> None</b>"
+            )
 
     # yes, annotate...
 
