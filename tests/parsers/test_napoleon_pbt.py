@@ -76,7 +76,7 @@ def test_invalid_returns_head(example):
     trailing_ws=strategies.whitespace_f(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
-def test_arg_name(splat, name, trailing_ws, newline):
+def test_var_name(splat, name, trailing_ws, newline):
     """
     A var name begins with 0, 1 or 2 'splat' chars ("*")
     followed by a python var identifier

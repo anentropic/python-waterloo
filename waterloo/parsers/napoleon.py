@@ -25,7 +25,8 @@ from waterloo.types import (
     VALID_ARGS_SECTION_NAMES,
     VALID_RETURNS_SECTION_NAMES,
 )
-from .utils import typed_mark
+from .python import python_identifier
+from .utils import regex, typed_mark
 
 
 __all__ = ('docstring_parser',)
@@ -74,19 +75,6 @@ returns_head = returns_section_name << parsy.string(':') << (sc + char.eol)
 
 
 # PYTHON IDENTIFIERS
-
-# a python var name
-# (approximate support for Py3 unicode identifiers PEP-3131, see
-# https://stackoverflow.com/questions/49100678/regex-matching-unicode-variable-names
-# ...the regex is a bit too lenient accepting some chars that python doesn't)
-@parsy.generate
-def python_identifier() -> parsy.Parser:
-    name = yield parsy.regex(r'[^\W0-9][\w]*')
-    if name.isidentifier():
-        return name
-    else:
-        yield parsy.fail("Not a valid python identifier")
-
 
 var_name = lexeme(
     parsy.regex(r'\*{0,2}') +

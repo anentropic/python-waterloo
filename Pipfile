@@ -6,8 +6,6 @@ name = "pypi"
 [dev-packages]
 ipython = ">=7.10.1"
 ipdb = "*"
-pdbpp = "*"
-twine = "*"
 pytest = "*"
 hypothesis = "*"
 pytype = "*"
@@ -19,10 +17,10 @@ prompt-toolkit = "*"
 typesystem = "*"
 toml = "*"
 typing-extensions = "*"
+regex = "*"
 
 [requires]
 python_version = "3.7"
 
 [pipenv]
-# NOTE: use `pipenv install --pre` due to issue with fissix sub-dep of bowler
 allow_prereleases = true
