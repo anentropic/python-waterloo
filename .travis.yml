@@ -7,11 +7,9 @@ python:
   - "3.7"
   - "3.8"
 install:
-  - pip install hypothesis
-  - pip install pytype
-  - pip install typing-extensions==3.7.4.1
+  - pip install pipenv
+  - pipenv install --dev
   - pip install .
-  # (note: pytest already available in travis, breaks if we install our own)
 script:
-  - pytype waterloo/
-  - pytest tests/
+  - if (( $(bc -l <<< "${TRAVIS_PYTHON_VERSION} < 3.8") )); then pytype waterloo/; fi
+  - pytest -v tests/

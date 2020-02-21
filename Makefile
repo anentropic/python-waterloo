@@ -1,4 +1,4 @@
-.PHONY: pypi, tag, mypy, pytest, test, shell
+.PHONY: pypi, tag, shell, typecheck, pytest, test
 
 pypi:
 	rm -f dist/*

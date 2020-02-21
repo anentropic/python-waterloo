@@ -18,6 +18,7 @@ bowler = "*"
 prompt-toolkit = "*"
 typesystem = "*"
 toml = "*"
+typing-extensions = "*"
 
 [requires]
 python_version = "3.7"
