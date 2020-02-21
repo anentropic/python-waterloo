@@ -11,5 +11,6 @@ install:
   - pipenv install --dev
   - pip install .
 script:
-  - if (( $(bc -l <<< "${TRAVIS_PYTHON_VERSION} < 3.8") )); then pytype waterloo/; fi
+  # pytype does not work under 3.8 yet, and we only need to typecheck one 3.x version
+  - if (( $(bc -l <<< "${TRAVIS_PYTHON_VERSION} == 3.7") )); then pytype waterloo/; fi
   - pytest -v tests/
