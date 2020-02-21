@@ -8,10 +8,10 @@ python:
   - "3.8"
 install:
   - pip install hypothesis
-  - pip install mypy==0.711
+  - pip install pytype
   - pip install typing-extensions==3.7.4.1
   - pip install .
   # (note: pytest already available in travis, breaks if we install our own)
 script:
-  - mypy --ignore-missing-imports waterloo
+  - pytype waterloo/
   - pytest tests/

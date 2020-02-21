@@ -1,6 +1,7 @@
 import argparse
 
 from waterloo.annotator import annotate
+from waterloo.conf import settings
 
 
 def main():
@@ -65,12 +66,14 @@ def main():
     if args.indent.lower() == "t":
         indent = "\t"
     else:
-        indent = int(args.indent)
+        indent = " " * int(args.indent)
+
+    settings.INDENT = indent
+    settings.MAX_INDENT_LEVEL = args.max_indent_level
+    settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
 
     annotate(
         *args.files,
-        project_indent=indent,
-        max_indent_level=args.max_indent_level,
         interactive=args.interactive,
         write=args.write,
         silent=not args.show_diff,

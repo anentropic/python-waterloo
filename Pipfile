@@ -10,12 +10,18 @@ pdbpp = "*"
 twine = "*"
 pytest = "*"
 hypothesis = "*"
-mypy = "==0.711"  # newer versions (<= 0.761) have even less support for recursive types
+pytype = "*"
 
 [packages]
-megaparsy = {git = "https://github.com/anentropic/megaparsy"}
+megaparsy = "*"
 bowler = "*"
 prompt-toolkit = "*"
+typesystem = "*"
+toml = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+# NOTE: use `pipenv install --pre` due to issue with fissix sub-dep of bowler
+allow_prereleases = true

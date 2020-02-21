@@ -101,6 +101,7 @@ ENV/
 .mypy_cache/
 # pyre
 .pyre/
+.pytype/
 
 # training
 training/data/images
