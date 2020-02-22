@@ -8,7 +8,7 @@ python:
   - "3.8"
 install:
   - pip install pipenv
-  - pipenv install --dev
+  - pipenv install --dev --skip-lock
   - pip install .
 script:
   # pytype does not work under 3.8 yet, and we only need to typecheck one 3.x version
