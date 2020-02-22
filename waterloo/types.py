@@ -12,7 +12,6 @@ from typing import (
     Tuple,
     Union,
 )
-from typing_extensions import Protocol
 
 
 class ArgsSection(str, Enum):
@@ -66,19 +65,7 @@ def _repr_type_arg(
         raise TypeError(arg)
 
 
-class TypeAtomic(Protocol):
-    @property
-    def name(self) -> str: ...
-
-    @property
-    def args(self) -> Iterable['TypeAtomic']: ...
-
-    def to_annotation(self, fix_dotted_paths=True) -> str: ...
-
-    def type_names(self) -> Set[str]: ...
-
-
-class TypeAtom(NamedTuple):  # type: ignore[misc]
+class TypeAtom(NamedTuple):
     name: str
     args: Iterable['TypeAtom']
 
@@ -124,7 +111,7 @@ class SourcePos(NamedTuple):
         )
 
 
-class TypeDef(NamedTuple):  # type: ignore[misc]
+class TypeDef(NamedTuple):
     start_pos: SourcePos
     type_atom: TypeAtom
     end_pos: SourcePos
@@ -171,15 +158,6 @@ class ArgTypes:
         """
         We need all args to have a type, otherwise we can't output a valid
         py2 type comment.
-
-        TODO:
-        For py3 we could potentially output annotations only for the args
-        with specified types.
-        Similarly for py2 we could output in this style:
-        https://mypy.readthedocs.io/en/stable/python2.html#multi-line-python-2-function-annotations
-        ...and then missing arg types would be acceptable. But that is harder
-        to format...
-        (in both cases these args will be treated as implicit `Any` by mypy)
         """
         is_fully_typed = all(
             arg is not None for arg in args.values()

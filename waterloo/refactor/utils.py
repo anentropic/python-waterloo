@@ -58,13 +58,13 @@ BUILTIN_TYPE_NAMES = {
 
 TYPING_TYPE_NAMES = {
     name
-    for name in dir(typing)
-    if isinstance(  # type: ignore
+    for name in dir(typing)  # type: ignore
+    if isinstance(
         getattr(typing, name),
         (
             typing._GenericAlias,  # type: ignore[attr-defined,arg-type]
-            typing._SpecialForm,
-            typing.TypeVar,
+            typing._SpecialForm,  # type: ignore
+            typing.TypeVar,  # type: ignore
         )
     )
 }

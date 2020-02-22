@@ -1,4 +1,4 @@
-.PHONY: pypi, tag, mypy, pytest, test, shell
+.PHONY: pypi, tag, shell, typecheck, pytest, test
 
 pypi:
 	rm -f dist/*
@@ -13,12 +13,12 @@ tag:
 shell:
 	PYTHONPATH=waterloo:tests:$$PYTHONPATH ipython
 
-mypy:
-	mypy --ignore-missing-imports waterloo
+typecheck:
+	pytype waterloo
 
 pytest:
 	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/
 
 test:
-	$(MAKE) mypy
+	$(MAKE) typecheck
 	$(MAKE) pytest

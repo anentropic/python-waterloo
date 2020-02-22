@@ -2,8 +2,8 @@ from collections import OrderedDict
 
 import pytest
 
-from waterloo.annotator.utils import get_type_comment, remove_types
 from waterloo.parsers.napoleon import docstring_parser
+from waterloo.refactor.utils import get_type_comment, remove_types
 from waterloo.types import (
     ArgsSection,
     ArgTypes,

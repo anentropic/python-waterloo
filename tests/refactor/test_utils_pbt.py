@@ -2,8 +2,8 @@ import pprint
 
 from hypothesis import given, note
 
-from waterloo.annotator.utils import remove_types
 from waterloo.parsers.napoleon import docstring_parser
+from waterloo.refactor.utils import remove_types
 
 from tests.parsers import strategies
 

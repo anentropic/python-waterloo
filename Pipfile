@@ -6,16 +6,20 @@ name = "pypi"
 [dev-packages]
 ipython = ">=7.10.1"
 ipdb = "*"
-pdbpp = "*"
-twine = "*"
 pytest = "*"
 hypothesis = "*"
-mypy = "==0.711"  # newer versions (<= 0.761) have even less support for recursive types
+pytype = {version="*", markers="python_version = '3.7'"}
 
 [packages]
-megaparsy = {git = "https://github.com/anentropic/megaparsy"}
+megaparsy = "*"
 bowler = "*"
 prompt-toolkit = "*"
+typesystem = "*"
+toml = "*"
+regex = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

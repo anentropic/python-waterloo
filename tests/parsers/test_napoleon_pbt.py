@@ -19,12 +19,12 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_atom,
 )
+from waterloo.refactor.utils import slice_by_pos
 from waterloo.types import (
     ArgsSection,
     TypeAtom,
     VALID_RETURNS_SECTION_NAMES,
 )
-from waterloo.annotator.utils import slice_by_pos
 
 from tests.parsers import strategies
 
@@ -76,7 +76,7 @@ def test_invalid_returns_head(example):
     trailing_ws=strategies.whitespace_f(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
-def test_arg_name(splat, name, trailing_ws, newline):
+def test_var_name(splat, name, trailing_ws, newline):
     """
     A var name begins with 0, 1 or 2 'splat' chars ("*")
     followed by a python var identifier

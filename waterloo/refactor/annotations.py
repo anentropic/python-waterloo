@@ -1,24 +1,32 @@
 import re
 from threading import local
-from typing import List, Optional, Sequence, Type
+from typing import Sequence
 
-from bowler import Capture, Filename, LN, Query
-from fissix.fixer_base import BaseFix
+import parsy
+from bowler import Capture, Filename, LN
 from fissix.fixer_util import Newline
 from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
+from waterloo.conf import settings
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.annotator.utils import (
+from waterloo.refactor.base import (
+    interrupt_modifier,
+    NonMatchingFixer,
+    WaterlooQuery,
+)
+from waterloo.refactor.exceptions import Interrupt
+from waterloo.refactor.utils import (
     get_type_comment,
     get_import_lines,
     remove_types,
 )
+from waterloo.types import TypeSignature
 from waterloo.utils import StylePrinter
 
 
-echo = StylePrinter()
+echo = StylePrinter(settings.get('ECHO_STYLES'))
 
 
 IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
@@ -39,20 +47,6 @@ def _cleanup_threadlocals():
         del threadlocals.comment_count
     except AttributeError:
         pass
-
-
-class NonMatchingFixer(BaseFix):
-    PATTERN = None  # type: ignore
-    BM_compatible = False
-
-    def match(self, node: LN) -> bool:
-        # we don't need to participate in the matching phase, we just want
-        # our `finish_tree` method to be called once after other modifiers
-        # have completed their work...
-        return False
-
-    def transform(self, node: LN, capture: Capture) -> Optional[LN]:
-        return node
 
 
 class StartFile(NonMatchingFixer):
@@ -108,6 +102,7 @@ def f_has_docstring(node: LN, capture: Capture, filename: Filename) -> bool:
     return result
 
 
+@interrupt_modifier
 def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     """
     (modifier)
@@ -118,20 +113,50 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # since we filtered for funcs with a docstring, the initial_indent_node
     # should be the indent before the start of the docstring quotes.
     initial_indent = capture['initial_indent_node'][0]
+    function = capture['function_name']
 
-    # TODO: error handling
-    signature = docstring_parser.parse(capture['docstring_node'].value)
-    if not signature.has_types:
-        return node
-
-    if not signature.is_fully_typed:
-        function = capture['function_name']
-        echo.warning(
-            f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b>"
-            f" did not fully specify args and return types.\n"
-            f"   Please edit the generated annotation manually 👀"
+    try:
+        signature = docstring_parser.parse(capture['docstring_node'].value)
+    except parsy.ParseError as e:
+        echo.error(
+            f"🛑 <b>line {function.lineno}:</b> Error parsing docstring for <b>def {function.value}</b>\n"
+            f"   {e!r}"
         )
+        raise Interrupt
 
+    if not signature.has_types:
+        raise Interrupt
+
+    # are we okay to annotate?
+    if not signature.arg_types.is_fully_typed:
+        if not settings.ALLOW_UNTYPED_ARGS:
+            echo.error(
+                f"🛑 <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types.\n"
+                f"   (no type annotation added)"
+            )
+            raise Interrupt
+        else:
+            echo.warning(
+                f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types.\n"
+                f"   -> args annotated as <b>(...)</b>"
+            )
+
+    if not signature.return_type or not signature.return_type.is_fully_typed:
+        if settings.REQUIRE_RETURN_TYPE:
+            echo.error(
+                f"🛑 <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
+                f"   (no type annotation added)"
+            )
+            raise Interrupt
+        else:
+            echo.warning(
+                f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
+                f"   -> return annotated as <b>-> None</b>"
+            )
+
+    # yes, annotate...
+
+    # record types found in this docstring
     threadlocals.type_names |= signature.type_names()
 
     # add the type comment as first line of func body (before docstring)
@@ -139,6 +164,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     threadlocals.comment_count += 1
 
+    # remove types from docstring
     new_docstring_node = capture['docstring_node'].clone()
     new_docstring_node.value = remove_types(
         docstring=capture['docstring_node'].value,
@@ -225,7 +251,7 @@ class AddTypeImports(NonMatchingFixer):
         if unimported:
             echo.warning(
                 "⚠️  Could not determine imports for these types: {}\n"
-                "   (will assume it is already imported or defined in file)".format(
+                "   (will assume types already imported or defined in file)".format(
                     f", ".join(
                         f"<b>{name}</b>"
                         for name in sorted(unimported)
@@ -239,39 +265,7 @@ class AddTypeImports(NonMatchingFixer):
             tree.insert_child(insert_pos, import_node)
 
 
-class WaterlooQuery(Query):
-    """
-    Bowler's `Query.fixer()` method will take the Fixer you give it and replace
-    it with their own class. This means there are some things you could do
-    with a custom Fixer which won't be possible.
-
-    So this class fixes that by allowing you to pass a custom Fixer that will
-    be used as-is.
-
-    See https://github.com/jreese/fissix/blob/master/fissix/fixer_base.py
-    """
-    raw_fixers: List[Type[BaseFix]]
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.raw_fixers = []
-
-    def raw_fixer(self, fx: Type[BaseFix]) -> "WaterlooQuery":
-        self.raw_fixers.append(fx)
-        return self
-
-    def compile(self) -> List[Type[BaseFix]]:
-        fixers = super().compile()
-        fixers.extend(self.raw_fixers)
-        return fixers
-
-
-def annotate(
-    *paths: str,
-    project_indent: str = "    ",
-    max_indent_level: int = 10,
-    **execute_kwargs
-):
+def annotate(*paths: str, **execute_kwargs):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
@@ -290,16 +284,16 @@ def annotate(
             document, but we can't measure it so just use an arbitrary large
             enough number.
         **execute_kwargs: passed into the bowler `Query.execute()` method
-
-    TODO:
-    remove types from docstring a la:
-    https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#type-annotations
-    sphinx can still render types in docs in this case thanks to:
-    https://pypi.org/project/sphinx-autodoc-typehints/#using-type-hint-comments
     """
+    echo.debug("Running with options:")
+    for key, val in settings.items():
+        echo.debug(f"- {key}: <b>{val!r}</b>")
+    echo.debug("")
+
     # generate pattern-match for every indent level up to `max_indent_level`
     indent_patterns = "|".join(
-        "'%s'" % (project_indent * i) for i in range(1, max_indent_level + 1)
+        "'%s'" % (settings.INDENT * i)
+        for i in range(1, settings.MAX_INDENT_LEVEL + 1)
     )
 
     q = (

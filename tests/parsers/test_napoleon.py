@@ -14,6 +14,7 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_atom,
 )
+from waterloo.refactor.utils import slice_by_pos
 from waterloo.types import (
     ArgsSection,
     ArgTypes,
@@ -24,13 +25,15 @@ from waterloo.types import (
     TypeDef,
     TypeSignature,
 )
-from waterloo.annotator.utils import slice_by_pos
 
 """
 Manually-constructed test-cases for the parsers
 
 These are less exhaustive than the PBT tests but it's much easier
 to see what is being parsed and expected output.
+
+(over time I have also pasted some adversarial examples that Hypothesis
+found into these cases as a quick way to iterate on fixing them....)
 """
 
 
@@ -50,10 +53,20 @@ def test_args_head():
     "Dict",
     "var_1_2_abc",
     "ClassName",
+    b'A\xf3\xa0\x84\x80'.decode('utf8'),  # looks like "A", isidentifier()=True
+    "A፩",
+    "*args",
+    "**kwargs",
+    "*balrogs",
+    "**Waargh",
+    "str ",
+    "Dict  ",
+    "var_1_2_abc\t",
+    "ClassName   ",
 ])
 def test_var_name_valid(example):
     result = var_name.parse(example)
-    assert result == example
+    assert result == example.rstrip()
 
 
 @pytest.mark.parametrize('example', [
@@ -61,6 +74,8 @@ def test_var_name_valid(example):
     "1name",
     "no-hyphens",
     "one two three",
+    "A (A)",
+    "***args",
 ])
 def test_var_name_invalid(example):
     with pytest.raises(parsy.ParseError):
@@ -118,6 +133,10 @@ def test_var_name_invalid(example):
         TypeAtom("str", []),
         TypeAtom("ClassName", [])
      ])),
+    ("A[A፩\n]",
+     TypeAtom("A", [
+        TypeAtom("A፩", []),
+     ]))
 ])
 def test_type_atom_valid(example, expected):
     result = type_atom.parse(example)
