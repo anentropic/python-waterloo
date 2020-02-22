@@ -1,6 +1,7 @@
 import argparse
 
-from waterloo.annotator import annotate
+from waterloo.__about__ import __version__
+from waterloo.refactor import annotate
 from waterloo.conf import settings
 
 
@@ -12,14 +13,29 @@ def main():
             f" into PEP-484 type comments which can be checked statically"
             f" using `mypy --py2`"
         ),
+    )
+
+    subparsers = parser.add_subparsers(
+        dest='subparser', title='commands',
+    )
+
+    version_cmd = subparsers.add_parser(
+        "version",
+        help="Echo current waterloo version.",
+    )
+
+    annotate_cmd = subparsers.add_parser(
+        "annotate",
+        help="Annotate a file or set of files.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
+
+    annotate_cmd.add_argument(
         'files', metavar='F', type=str, nargs='+',  # required
         help='List of file or directory paths to process.',
     )
 
-    indent_group = parser.add_argument_group('indentation options')
+    indent_group = annotate_cmd.add_argument_group('indentation options')
     indent_group.add_argument(
         '--indent', type=str, default="4",
         help="Due to multi-process architecture of the underlying Bowler "
@@ -36,7 +52,7 @@ def main():
         "matches for (indents larger than this will not be detected).",
     )
 
-    annotation_group = parser.add_argument_group('annotation options')
+    annotation_group = annotate_cmd.add_argument_group('annotation options')
     annotation_group.add_argument(
         '-aa', '--allow-untyped-args', action='store_true', default=False,
         help="If any args or return types are found in docstring we can "
@@ -54,7 +70,7 @@ def main():
         "error."
     )
 
-    apply_group = parser.add_argument_group('apply options')
+    apply_group = annotate_cmd.add_argument_group('apply options')
     apply_group.add_argument(
         '-w', '--write', action='store_true', default=False,
         help="Whether to apply the changes to target files. Without this "
@@ -70,6 +86,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.subparser == "version":
+        print(__version__)
+        return
 
     if args.indent.lower() == "t":
         indent = "\t"

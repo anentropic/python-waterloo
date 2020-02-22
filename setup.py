@@ -59,8 +59,9 @@ setup(
 
     packages=[
         'waterloo',
-        'waterloo.annotator',
+        'waterloo.conf',
         'waterloo.parsers',
+        'waterloo.refactor',
     ],
 
     # https://mypy.readthedocs.io/en/latest/installed_packages.html#making-pep-561-compatible-packages

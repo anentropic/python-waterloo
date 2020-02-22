@@ -4,7 +4,7 @@ from typing import List, Optional, Type
 from bowler import Capture, Filename, LN, Query
 from fissix.fixer_base import BaseFix
 
-from waterloo.annotator.exceptions import Interrupt
+from waterloo.refactor.exceptions import Interrupt
 
 
 class NonMatchingFixer(BaseFix):

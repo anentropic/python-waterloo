@@ -12,7 +12,7 @@ from typing import (
     Tuple,
     Union,
 )
-from typing_extensions import Protocol
+# from typing_extensions import Protocol
 
 
 class ArgsSection(str, Enum):

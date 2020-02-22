@@ -14,6 +14,7 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_atom,
 )
+from waterloo.refactor.utils import slice_by_pos
 from waterloo.types import (
     ArgsSection,
     ArgTypes,
@@ -24,7 +25,6 @@ from waterloo.types import (
     TypeDef,
     TypeSignature,
 )
-from waterloo.annotator.utils import slice_by_pos
 
 """
 Manually-constructed test-cases for the parsers

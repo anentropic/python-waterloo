@@ -19,9 +19,14 @@ After we parse the docstrings and prepare the type comments (and imports of ment
 
 In short you can...
 ```
-waterloo my-project-dir/ --write
+waterloo annotate my-project-dir/ --write
 ```
 ...and it will derive type comments from all of your typed docstrings and add them to the files.
+
+To preview the changes without committing them:
+```
+waterloo annotate my-project-dir/ --show-diff
+```
 
 Waterloo itself requires Python 3.6 or later, but is designed for projects still on Python 2.7.
 

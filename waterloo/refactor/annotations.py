@@ -9,19 +9,19 @@ from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
-from waterloo.annotator.base import (
+from waterloo.conf import settings
+from waterloo.parsers.napoleon import docstring_parser
+from waterloo.refactor.base import (
     interrupt_modifier,
     NonMatchingFixer,
     WaterlooQuery,
 )
-from waterloo.annotator.exceptions import Interrupt
-from waterloo.annotator.utils import (
+from waterloo.refactor.exceptions import Interrupt
+from waterloo.refactor.utils import (
     get_type_comment,
     get_import_lines,
     remove_types,
 )
-from waterloo.conf import settings
-from waterloo.parsers.napoleon import docstring_parser
 from waterloo.types import TypeSignature
 from waterloo.utils import StylePrinter
 
@@ -287,7 +287,7 @@ def annotate(*paths: str, **execute_kwargs):
     """
     echo.debug("Running with options:")
     for key, val in settings.items():
-        echo.debug(f"- {key}: {val!r}")
+        echo.debug(f"- {key}: <b>{val!r}</b>")
     echo.debug("")
 
     # generate pattern-match for every indent level up to `max_indent_level`

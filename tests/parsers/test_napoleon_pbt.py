@@ -19,12 +19,12 @@ from waterloo.parsers.napoleon import (
     var_name,
     type_atom,
 )
+from waterloo.refactor.utils import slice_by_pos
 from waterloo.types import (
     ArgsSection,
     TypeAtom,
     VALID_RETURNS_SECTION_NAMES,
 )
-from waterloo.annotator.utils import slice_by_pos
 
 from tests.parsers import strategies
 
