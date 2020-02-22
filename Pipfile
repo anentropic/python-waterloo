@@ -16,7 +16,6 @@ bowler = "*"
 prompt-toolkit = "*"
 typesystem = "*"
 toml = "*"
-typing-extensions = "*"
 regex = "*"
 
 [requires]

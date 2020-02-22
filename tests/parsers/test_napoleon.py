@@ -55,10 +55,18 @@ def test_args_head():
     "ClassName",
     b'A\xf3\xa0\x84\x80'.decode('utf8'),  # looks like "A", isidentifier()=True
     "A፩",
+    "*args",
+    "**kwargs",
+    "*balrogs",
+    "**Waargh",
+    "str ",
+    "Dict  ",
+    "var_1_2_abc\t",
+    "ClassName   ",
 ])
 def test_var_name_valid(example):
     result = var_name.parse(example)
-    assert result == example
+    assert result == example.rstrip()
 
 
 @pytest.mark.parametrize('example', [
@@ -67,6 +75,7 @@ def test_var_name_valid(example):
     "no-hyphens",
     "one two three",
     "A (A)",
+    "***args",
 ])
 def test_var_name_invalid(example):
     with pytest.raises(parsy.ParseError):

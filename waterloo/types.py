@@ -12,7 +12,6 @@ from typing import (
     Tuple,
     Union,
 )
-# from typing_extensions import Protocol
 
 
 class ArgsSection(str, Enum):
@@ -64,18 +63,6 @@ def _repr_type_arg(
         return f"[{sub_args}]"
     else:
         raise TypeError(arg)
-
-
-# class TypeAtomic(Protocol):
-#     @property
-#     def name(self) -> str: ...
-
-#     @property
-#     def args(self) -> Iterable['TypeAtomic']: ...
-
-#     def to_annotation(self, fix_dotted_paths=True) -> str: ...
-
-#     def type_names(self) -> Set[str]: ...
 
 
 class TypeAtom(NamedTuple):
