@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 import parsy
 import pytest
 
@@ -14,6 +12,7 @@ to see what is being parsed and expected output.
 (over time I have also pasted some adversarial examples that Hypothesis
 found into these cases as a quick way to iterate on fixing them....)
 """
+
 
 @pytest.mark.parametrize('example', [
     "str",

@@ -1,10 +1,6 @@
-import re
-from collections import Counter, OrderedDict
-
 import parsy
 import pytest
-from hypothesis import given, note, strategies as st
-from typing import Dict
+from hypothesis import given, strategies as st
 
 from waterloo.parsers.python import python_identifier
 
@@ -16,6 +12,7 @@ These are more exhaustive than the handwritten tests (and found some bugs
 and edge cases which they did not) but they are harder to understand.
 They are also reassuringly slow to run ;)
 """
+
 
 @given(st.text(min_size=1, max_size=8))
 def test_python_identifier(example):

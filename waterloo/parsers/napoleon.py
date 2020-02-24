@@ -26,7 +26,7 @@ from waterloo.types import (
     VALID_RETURNS_SECTION_NAMES,
 )
 from .python import python_identifier
-from .utils import regex, typed_mark
+from .utils import typed_mark
 
 
 __all__ = ('docstring_parser',)
@@ -155,14 +155,14 @@ def _line_fold_callback(sc_: parsy.Parser) -> parsy.Parser:
 p_line_fold = line_fold(scn, _line_fold_callback)
 
 
-def indented_items(p_arg_item: parsy.Parser) -> parsy.Parser:
+def indented_items(p_item: parsy.Parser) -> parsy.Parser:
     """
     Factory returning parser to consume the items within a section
     """
 
     @parsy.generate
     def _indented_items() -> IndentMany:
-        head = yield p_arg_item
+        head = yield p_item
         # in this case the `head` is the part of the item we care about
         # and `tail` is be the folded arg description, we discard it
         return IndentMany(indent=None, f=lambda _: head, p=p_line_fold)
@@ -172,7 +172,7 @@ def indented_items(p_arg_item: parsy.Parser) -> parsy.Parser:
 
 def section(
     p_section_name: parsy.Parser,
-    p_arg_items: parsy.Parser,
+    p_items: parsy.Parser,
 ) -> parsy.Parser:
     """
     Factory returning parser to consume a section and its indented items
@@ -184,7 +184,7 @@ def section(
         return IndentSome(
             indent=None,
             f=lambda tail: {'name': head, 'items': tail},
-            p=p_arg_items,
+            p=p_items,
         )
 
     return _args_list_block
