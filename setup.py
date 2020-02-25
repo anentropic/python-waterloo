@@ -29,6 +29,7 @@ setup(
         "'Napoleon' format) to PEP-484 Py2 type comments."
     ),
     long_description=long_description,
+    long_description_content_type="text/markdown",
 
     url='https://github.com/anentropic/python-waterloo',
 
