@@ -78,6 +78,49 @@ allow_untyped_args = false
 require_return_type = true
 ```
 
+### Notes on 'Napoleon' docstring format
+
+The format is defined here https://sphinxcontrib-napoleon.readthedocs.io/en/latest/
+
+For now we only support the "Google-style" option. Open an issue if you need the alternative "Numpy-style" format.
+
+In addition to the [official list](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections) of Section headings we also allow `Kwargs:` (since I'd used that one myself in many places).
+
+If you run waterloo with `--show-diff` option you will notice that we automatically add imports for the annotated types:
+
+```diff
+--- tests/fixtures/napoleon.py
++++ tests/fixtures/napoleon.py
+@@ -2,6 +2,8 @@
+ Boring docstring for the module itself
+ """
+ import logging
++from engine.models import Product
++from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+
+ logger = logging.getLogger(__name__)
+```
+
+Built-in types and those from `typing` module are recognised. For other types we can still generate the import as long as you use dotted-path syntax in the docstring, for example:
+
+```python
+"""
+    Args:
+        products (Union[Iterable[Dict], Iterable[engine.models.Product]])
+        getter (Callable[[str], Callable])
+"""
+```
+
+In this docstring, waterloo is able to add the `from engine.models import Product` import.
+
+If your docstrings don't have dotted paths you will see warnings like:
+```
+⚠️  Could not determine imports for these types: MysteryType
+   (will assume types already imported or defined in file)
+```
+
+Waterloo will still add the annotation to the function, but when you try to run mypy on this file it will complain that `MysteryType` is not imported. You will then have to resolve that manually.
+
 ### Upgrading your project to Python 3
 
 Adding type comments with `waterloo` can be an intermediate step. You can start type checking with `mypy` while you're still on Python 2.7.
