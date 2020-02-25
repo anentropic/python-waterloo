@@ -119,7 +119,9 @@ If your docstrings don't have dotted paths you will see warnings like:
    (will assume types already imported or defined in file)
 ```
 
-Waterloo will still add the annotation to the function, but when you try to run mypy on this file it will complain that `MysteryType` is not imported. You will then have to resolve that manually.
+Waterloo will still add the annotation to the function, but when you try to run mypy on this file it will complain that `MysteryType` is not imported (if `MysteryType` is not already imported or defined in the file). You will then have to resolve that manually.
+
+You may want to run a formatter such as [isort](https://github.com/timothycrosley/isort) on your code after applying annotations with waterloo, since it will just append the imports to the bottom of your existing import block.
 
 ### Upgrading your project to Python 3
 
