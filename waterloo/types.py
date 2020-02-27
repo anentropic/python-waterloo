@@ -5,6 +5,7 @@ from enum import Enum
 from typing import (
     cast,
     Dict,
+    Final,
     Iterable,
     NamedTuple,
     Optional,
@@ -29,7 +30,7 @@ class Types(str, Enum):
 
 
 # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections
-VALID_ARGS_SECTION_NAMES = {
+VALID_ARGS_SECTION_NAMES: Final = {
     'Args',
     'Kwargs',  # not an official part of Napoleon spec but frequently used
     'Arguments',
@@ -38,7 +39,7 @@ VALID_ARGS_SECTION_NAMES = {
     'Parameters',
 }
 
-VALID_RETURNS_SECTION_NAMES = {
+VALID_RETURNS_SECTION_NAMES: Final = {
     'Return': (r'Return(?!s)', ReturnsSection.RETURNS),
     'Returns': (r'Returns', ReturnsSection.RETURNS),
     'Yield': (r'Yield(?!s)', ReturnsSection.YIELDS),
@@ -246,4 +247,6 @@ class TypeSignature:
 
 class ImportsForTypes(NamedTuple):
     imports: Dict[str, Set[str]]
-    unimported: Set[str]
+
+
+ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}

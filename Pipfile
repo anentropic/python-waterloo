@@ -8,15 +8,15 @@ ipython = ">=7.10.1"
 ipdb = "*"
 pytest = "*"
 hypothesis = "*"
-pytype = {version="*", markers="python_version = '3.7'"}
+pytype = {version = "*",markers = "python_version = '3.7'"}
 
 [packages]
 megaparsy = "*"
 bowler = "*"
 prompt-toolkit = "*"
-typesystem = "*"
 toml = "*"
 regex = "*"
+pydantic = "*"
 
 [requires]
 python_version = ">=3.7"
