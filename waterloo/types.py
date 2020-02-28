@@ -1,11 +1,10 @@
 from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from typing import (
     cast,
     Dict,
-    Final,
     Iterable,
     NamedTuple,
     Optional,
@@ -13,6 +12,7 @@ from typing import (
     Tuple,
     Union,
 )
+from typing_extensions import Final
 
 
 class ArgsSection(str, Enum):
@@ -245,8 +245,80 @@ class TypeSignature:
         return names
 
 
-class ImportsForTypes(NamedTuple):
-    imports: Dict[str, Set[str]]
+@dataclass(frozen=True)
+class LocalTypes:
+    class_defs: Set[str]
+    star_imports: Set[str]
+    names_to_modules: Dict[str, str]
+
+    all_names: Set[str]
+
+    @classmethod
+    def factory(
+        cls,
+        class_defs: Set[str],
+        star_imports: Set[str],
+        names_to_modules: Dict[str, str],
+    ) -> 'LocalTypes':
+        # should be no overlap in names, that would be a bug in the src file!
+        assert not class_defs & names_to_modules.keys()
+        return cls(
+            class_defs=class_defs,
+            star_imports=star_imports,
+            names_to_modules=names_to_modules,
+            all_names=class_defs | names_to_modules.keys(),
+        )
+
+    def __contains__(self, name) -> bool:
+        return name in self.all_names
+
+    def __getitem__(self, name) -> Optional[str]:
+        try:
+            return self.names_to_modules[name]
+        except KeyError:
+            if name in self.class_defs:
+                return None
+            else:
+                raise KeyError(name)
+
+    def __len__(self):
+        return len(self.all_names)
+
+
+class ImportStrategy(Enum):
+    USE_EXISTING = auto()  # don't add any import
+    ADD_FROM = auto()
+    ADD_DOTTED = auto()
+
+
+class AmbiguousTypeError(Exception):
+    pass
+
+
+class ModuleHasStarImportError(AmbiguousTypeError):
+    pass
+
+
+class NotFoundNoPathError(AmbiguousTypeError):
+    pass
+
+
+class NameMatchesRelativeImportError(AmbiguousTypeError):
+    pass
+
+
+class AmbiguousTypePolicy(Enum):
+    AUTO = auto()  # warn, don't-annotate or import, depending the case
+    WARN = auto()  # annotate but don't add import, show warning
+    FAIL = auto()  # don't annotate, show error
 
 
 ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
+
+PRINTABLE_SETTINGS: Final = {
+    'INDENT',
+    'MAX_INDENT_LEVEL',
+    'ALLOW_UNTYPED_ARGS',
+    'REQUIRE_RETURN_TYPE',
+    'AMBIGUOUS_TYPE_POLICY',
+}

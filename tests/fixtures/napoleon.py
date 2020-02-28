@@ -2,10 +2,17 @@
 Boring docstring for the module itself
 """
 import logging
+from some.module import Imported
+if True:
+    from some.module import ConditionallyImported
 
 logger = logging.getLogger(__name__)
 
 SOME_CONST = 1
+
+
+class TopLevel(object):
+    pass
 
 
 def first(products, getter):
@@ -20,8 +27,9 @@ def first(products, getter):
         getter (Callable[[str], Callable])
 
     Returns:
-        Dict[int, List[Dict]]: {<product id>: <product videos>}
+        Dict[int, List[ConditionallyImported]]: {<product id>: <product videos>}
     """
+    from some.module import InnerImported
     return {}
 
 
@@ -37,18 +45,21 @@ def second(products, getter):
         getter (Callable[[str], Callable]): something else
 
     Returns:
-        Dict[int, List[Dict]]
+        Dict[int, List[TopLevel]]
 
     NOTE:
         whatever
     """
+    class InnerClass(object):
+        pass
+
     def second_inner(product, key, default):
         """
         Args:
             product (Dict[str, Any])
             key (MysteryType[str]): this type has not been imported and is not
                 defined in the document!
-            default (Any)
+            default (Imported)
 
         Raises:
             ExceptionError

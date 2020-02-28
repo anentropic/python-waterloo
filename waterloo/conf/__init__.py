@@ -3,7 +3,7 @@ from typing import Dict, Optional, Union
 import toml
 from pydantic import BaseSettings, validator
 
-from waterloo.types import UnresolvedTypePolicy, ECHO_STYLES_REQUIRED_FIELDS
+from waterloo.types import AmbiguousTypePolicy, ECHO_STYLES_REQUIRED_FIELDS
 
 
 class ConfigModel(BaseSettings):
@@ -16,17 +16,17 @@ class ConfigModel(BaseSettings):
     ALLOW_UNTYPED_ARGS: bool = False
     REQUIRE_RETURN_TYPE: bool = False
 
-    UNRESOLVED_TYPE_POLICY: Union[UnresolvedTypePolicy, str] = (
-        UnresolvedTypePolicy.AUTO
+    AMBIGUOUS_TYPE_POLICY: Union[AmbiguousTypePolicy, str] = (
+        AmbiguousTypePolicy.AUTO
     )
 
     ECHO_STYLES: Optional[Dict[str, str]] = None
 
-    @validator('UNRESOLVED_TYPE_POLICY')
+    @validator('AMBIGUOUS_TYPE_POLICY')
     def key_to_member(cls, value):
-        if isinstance(value, UnresolvedTypePolicy):
+        if isinstance(value, AmbiguousTypePolicy):
             return value
-        return UnresolvedTypePolicy[value]
+        return AmbiguousTypePolicy[value]
 
     @validator('ECHO_STYLES')
     def echo_styles_required_fields(cls, value):

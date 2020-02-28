@@ -1,11 +1,18 @@
+import ast
 import typing
-from enum import Enum
+from enum import Enum, auto
 from itertools import chain
 from operator import itemgetter
-from typing import cast, Dict, Iterable, List, Set, Tuple
+from typing import cast, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
+from waterloo.conf import settings
 from waterloo.types import (
-    ImportsForTypes,
+    AmbiguousTypePolicy,
+    ImportStrategy,
+    LocalTypes,
+    ModuleHasStarImportError,
+    NameMatchesRelativeImportError,
+    NotFoundNoPathError,
     SourcePos,
     TypeAtom,
     TypeDef,
@@ -70,61 +77,178 @@ TYPING_TYPE_NAMES = {
 }
 
 
-def _is_builtin_type(name: str):
+def _is_builtin_type(name: str) -> bool:
     return name in BUILTIN_TYPE_NAMES
 
 
-def _is_typing_type(name: str):
+def _is_typing_type(name: str) -> bool:
     return name in TYPING_TYPE_NAMES
 
 
-def _is_dotted_path(name: str):
+def _is_dotted_path(name: str) -> bool:
     return '.' in name and name != Types.ELLIPSIS
 
 
-def get_import_lines(type_names: Set[str]) -> ImportsForTypes:
-    """
-    We assume a type is either:
-    - a builtin (e.g `str`, `int` etc)
-    - a typing type (`Tuple`, `Dict` etc)
-    - a dotted import path to a type (e.g. `my.module.ClassName` or
-        `stdlib.module.typename`)
-    - else already imported/defined in the document
+def find_local_types(filename: str) -> LocalTypes:
+    with open(filename) as f:
+        tree = ast.parse(f.read(), filename=filename)
+    class_defs = set()
+    star_imports = set()
+    names_to_modules = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            class_defs.add(node.name)
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                prefix = "." * node.level
+                module = node.module or ""
+                name = alias.asname or alias.name
+                if name == "*":
+                    star_imports.add(f"{prefix}{module}")
+                else:
+                    names_to_modules[name] = f"{prefix}{module}"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if '.' not in alias.name:
+                    module = None
+                    name = alias.name
+                    # TODO can we assume this is never a type?
+                else:
+                    module, name = alias.name.rsplit('.', maxsplit=1)
+                if alias.asname:
+                    names_to_modules[alias.asname] = module
+                else:
+                    names_to_modules[name] = module
+    return LocalTypes.factory(
+        class_defs=class_defs,
+        star_imports=star_imports,
+        names_to_modules=names_to_modules,
+    )
 
-    This is a half-arsed best-effort... if you haven't followed this heuristic
-    when defining your docstring types then we will likely generate unnecessary
-    imports or fail to import types needed for mypy checking to work.
+
+def strategy_for_name_factory(
+    local_types: LocalTypes
+) -> Callable[[str], ImportStrategy]:
+    """
+    Args:
+        local_types: names from imports or local ClassDefs
+    """
+    def _strategy_for_name(name: str) -> ImportStrategy:
+        """
+        We use the following heuristic to determine behaviour for auto-adding
+        import statements where possible:
+
+        1. primary decision table
+                          | bare      | dotted path
+        not found         | warn      | add import
+        in locals         | use local | ? --> see 2. below
+        module name found | N/A       | warn*/fail/from-style-import **
+          in a * import   |           |
+
+        2. decision table if dotted-path + type-name in locals:
+        looks same path         | use existing
+        looks different path    | import as dotted
+        can't tell (e.g. locals | warn*/fail/import-as-dotted **
+          name uses relative    |
+          imports)              |
+
+        * if not in builtins or typing
+        ** configurably
+
+        Raises:
+            AmbiguousTypeError
+        """
+        if _is_dotted_path(name):
+            module, name = name.rsplit(".", maxsplit=1)
+            if name in local_types:
+                local_module = local_types[name]
+                if local_module is None or module == local_module:
+                    # `local_module is None` means local ClassDef
+                    # `module == local_module` means an exact match in imports
+                    return ImportStrategy.USE_EXISTING
+                elif local_module.startswith("."):
+                    # "can't tell"
+                    # we have a full path so we could add an import
+                    # but it may be duplicating something already imported
+                    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.AUTO:
+                        # the name was maybe already in scope but it's safe
+                        # to add a specific import as well
+                        return ImportStrategy.ADD_DOTTED
+                    else:
+                        # TODO in theory we could probably calculate the abs
+                        # import from filename + relative path, but it's awkward
+                        raise NameMatchesRelativeImportError(module, name)
+                else:
+                    # "looks like different path"
+                    return ImportStrategy.ADD_DOTTED
+            else:
+                # handle * imports? we could assume `name` is imported
+                # if `from module import *` is present... BUT:
+                # if `name.startswith("_")` it would be exempt
+                # and `__all__` could break both of these assumptions
+                # So... we treat any matching * import as AMBIGUOUS
+                if module in local_types.star_imports:
+                    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.AUTO:
+                        # the name was maybe already in scope but it's safe
+                        # to add a specific import as well
+                        return ImportStrategy.ADD_FROM
+                    else:
+                        raise ModuleHasStarImportError(module, name)
+                else:
+                    return ImportStrategy.ADD_FROM
+        else:
+            if name in local_types:
+                return ImportStrategy.USE_EXISTING
+            elif _is_builtin_type(name):
+                return ImportStrategy.USE_EXISTING
+            elif _is_typing_type(name):
+                return ImportStrategy.USE_EXISTING
+            else:
+                # there's no possibility to add an import, so no AUTO option
+                raise NotFoundNoPathError(None, name)
+
+    return _strategy_for_name
+
+
+def get_import_lines(
+    strategies: Dict[ImportStrategy, Set[str]]
+) -> Dict[str, Set[str]]:
+    """
+    This is best-effort... if you haven't used dotted paths when defining your
+    docstring types then we will likely be missing imports needed for mypy
+    checking to work.
 
     Furthermore it is assumed we will run `isort` on the resulting file, and
     perhaps `black`/`flake8`, to save us the hassle of trying to nicely format
     the inserted imports, or deduplicate them etc.
     """
-    builtins = {name for name in type_names if _is_builtin_type(name)}
-    type_names -= builtins
+    import_tuples: Tuple[Optional[str], str] = []
 
-    typing_types = {name for name in type_names if _is_typing_type(name)}
-    type_names -= typing_types
-
-    dotted_paths = {name for name in type_names if _is_dotted_path(name)}
-    type_names -= dotted_paths
-    # assume remaining type_names are defined in the file or already imported
-
-    import_tuples = [
+    typing_types = {
+        name
+        for name in strategies.get(ImportStrategy.USE_EXISTING, set())
+        if _is_typing_type(name)
+    }
+    import_tuples.extend(
         ('typing', name)
         for name in typing_types
-    ]
+    )
+
     import_tuples.extend(
         cast(Tuple[str, str], tuple(name.rsplit('.', maxsplit=1)))
-        for name in dotted_paths
+        for name in strategies.get(ImportStrategy.ADD_FROM, set())
     )
+
+    import_tuples.extend(
+        (None, name)
+        for name in strategies.get(ImportStrategy.ADD_DOTTED, set())
+    )
+
     imports_dict: Dict[str, Set[str]] = {}
     for left, right in import_tuples:
         imports_dict.setdefault(left, set()).add(right)
 
-    return ImportsForTypes(
-        imports=imports_dict,
-        unimported=type_names,
-    )
+    return imports_dict
 
 
 def slice_by_pos(val: str, start: SourcePos, end: SourcePos) -> str:
@@ -148,8 +272,8 @@ def slice_by_pos(val: str, start: SourcePos, end: SourcePos) -> str:
 
 
 class TypeDefRole(Enum):
-    ARG = 0
-    RETURN = 1
+    ARG = auto()
+    RETURN = auto()
 
 
 def _remove_type_def(

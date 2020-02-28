@@ -17,6 +17,7 @@ prompt-toolkit = "*"
 toml = "*"
 regex = "*"
 pydantic = "*"
+typing-extensions = "*"
 
 [requires]
 python_version = ">=3.7"

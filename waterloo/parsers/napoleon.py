@@ -29,7 +29,7 @@ from .python import python_identifier
 from .utils import typed_mark
 
 
-__all__ = ('docstring_parser',)
+__all__ = ('docstring_parser', '_nested')
 
 
 # logging.basicConfig(level=logging.DEBUG)
