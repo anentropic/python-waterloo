@@ -1,9 +1,10 @@
 from __future__ import annotations
 from collections import OrderedDict
+from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
 from enum import Enum, auto
+from functools import singledispatch
 from typing import (
-    cast,
     Dict,
     Iterable,
     NamedTuple,
@@ -46,34 +47,19 @@ VALID_RETURNS_SECTION_NAMES: Final = {
     'Yields': (r'Yields', ReturnsSection.YIELDS),
 }
 
-
-def _repr_type_arg(
-    arg: Union[str, 'TypeAtom', Iterable['TypeAtom']], fix_dotted_paths=True
-) -> str:
-    if isinstance(arg, str) or not arg:
-        val = cast(str, arg) or ''
-        if fix_dotted_paths and val != Types.ELLIPSIS:
-            val = val.split('.')[-1]
-        return val
-    elif isinstance(arg, TypeAtom):
-        return arg.to_annotation(fix_dotted_paths)
-    elif isinstance(arg, Iterable):
-        sub_args = ", ".join(
-            _repr_type_arg(sub, fix_dotted_paths) for sub in arg
-        )
-        return f"[{sub_args}]"
-    else:
-        raise TypeError(arg)
+NameToStrategy_T = Dict[str, 'ImportStrategy']
 
 
 class TypeAtom(NamedTuple):
     name: str
     args: Iterable['TypeAtom']
 
-    def to_annotation(self, fix_dotted_paths=True) -> str:
-        name = _repr_type_arg(self.name, fix_dotted_paths)
+    def to_annotation(
+        self, name_to_strategy: Optional[NameToStrategy_T]
+    ) -> str:
+        name = _repr_type_arg(self.name, name_to_strategy)
         if self.args:
-            args_annotations = _repr_type_arg(self.args, fix_dotted_paths)
+            args_annotations = _repr_type_arg(self.args, name_to_strategy)
             return f"{name}{args_annotations}"
         else:
             return name
@@ -93,6 +79,44 @@ class TypeAtom(NamedTuple):
                 for atom in arg:
                     names |= atom.type_names()
         return names
+
+
+@singledispatch
+def _repr_type_arg(val, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    """
+    Helper for representing a TypeAtom as a type annotation
+    """
+    raise TypeError(val)
+
+
+@_repr_type_arg.register
+def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    # `val` is the name from TypeAtom
+    if (
+        val != Types.ELLIPSIS and
+        name_to_strategy is not None
+        and name_to_strategy.get(val) is not ImportStrategy.ADD_DOTTED
+    ):
+        val = val.rsplit('.', maxsplit=1)[-1]
+    return val
+
+
+@_repr_type_arg.register
+def _(arg: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    return arg.to_annotation(name_to_strategy)
+
+
+@_repr_type_arg.register(IterableABC)
+def _(
+    val: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]
+) -> str:
+    if not val:
+        return ""
+    # recurse
+    sub_args = ", ".join(
+        _repr_type_arg(sub, name_to_strategy) for sub in val
+    )
+    return f"[{sub_args}]"
 
 
 class SourcePos(NamedTuple):
@@ -138,8 +162,10 @@ class TypeDef(NamedTuple):
     def args(self) -> Iterable[TypeAtom]:
         return self.type_atom.args
 
-    def to_annotation(self, fix_dotted_paths=True) -> str:
-        return self.type_atom.to_annotation(fix_dotted_paths)
+    def to_annotation(
+        self, name_to_strategy: Optional[NameToStrategy_T]
+    ) -> str:
+        return self.type_atom.to_annotation(name_to_strategy)
 
     def type_names(self) -> Set[str]:
         return self.type_atom.type_names()

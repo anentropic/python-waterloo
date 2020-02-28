@@ -45,7 +45,7 @@ from waterloo.types import (
      ])),
 ])
 def test_type_atom_to_annotation(expected, example):
-    assert example.to_annotation(False) == expected
+    assert example.to_annotation(None) == expected
 
 
 @pytest.mark.parametrize('expected,example', [

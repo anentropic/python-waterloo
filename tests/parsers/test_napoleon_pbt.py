@@ -133,7 +133,7 @@ def _add_normalised_whitespace(segment):
 def _normalise_annotation(annotation):
     """
     Take a dirty annotation and strip spurious newlines and whitespace so that
-    it should match the output from an equivalent TypeAtom.to_annotation(False)
+    it should match the output from an equivalent TypeAtom.to_annotation(None)
     """
     return ''.join(
         _add_normalised_whitespace(segment.strip())
@@ -143,7 +143,7 @@ def _normalise_annotation(annotation):
 
 def assert_annotation_roundtrip(example: str, result: TypeAtom):
     normalised = _normalise_annotation(example)
-    assert normalised == result.to_annotation(False)
+    assert normalised == result.to_annotation(None)
 
 
 @given(strategies.napoleon_type_annotation_f())

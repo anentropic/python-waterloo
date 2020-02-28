@@ -256,7 +256,7 @@ def napoleon_type_annotation_f(draw):
     - before a `]`
     """
     type_atom = draw(type_atom_f())
-    annotation = type_atom.to_annotation(False)
+    annotation = type_atom.to_annotation(None)
     return ''.join(
         _add_arbitrary_whitespace(
             segment=segment.strip(),

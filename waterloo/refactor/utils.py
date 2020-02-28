@@ -2,8 +2,7 @@ import ast
 import typing
 from enum import Enum, auto
 from itertools import chain
-from operator import itemgetter
-from typing import cast, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import cast, Callable, Dict, List, Optional, Set, Tuple
 
 from waterloo.conf import settings
 from waterloo.types import (
@@ -12,6 +11,7 @@ from waterloo.types import (
     LocalTypes,
     ModuleHasStarImportError,
     NameMatchesRelativeImportError,
+    NameToStrategy_T,
     NotFoundNoPathError,
     SourcePos,
     TypeAtom,
@@ -21,46 +21,39 @@ from waterloo.types import (
 )
 
 
-def _join_type_atoms(type_atoms: Iterable[TypeAtom]) -> str:
-    return ', '.join(atom.to_annotation() for atom in type_atoms)
-
-
-_type_getter = itemgetter('type')
-
-
-def get_type_comment(signature: TypeSignature) -> str:
+def get_type_comment(
+    signature: TypeSignature, name_to_strategy: NameToStrategy_T
+) -> str:
     """
     Args:
         signature: as per the result of `docstring_parser` containing
             details of the arg types and return type
 
     Returns:
-        a mypy py2 type comment for a function
+        a mypy py2 type comment for a function (as a string)
     """
     if signature.arg_types and signature.arg_types.is_fully_typed:
-        args = _join_type_atoms(
-            cast(TypeAtom, atom) for atom in signature.arg_types.args.values()
+        args = ", ".join(
+            cast(TypeAtom, atom).to_annotation(name_to_strategy)
+            for atom in signature.arg_types.args.values()
         )
     else:
-        # TODO:
-        # unless we are outputting
-        # https://mypy.readthedocs.io/en/stable/python2.html#multi-line-python-2-function-annotations
-        # then we should emit a warning here instead of this which
-        # is like an implicit `Any` for all args
+        # to avoid reaching this case, configure ALLOW_UNTYPED_ARGS=False
         args = Types.ELLIPSIS
     if signature.return_type and signature.return_type.type_def:
-        returns = signature.return_type.type_def.to_annotation()
+        returns = signature.return_type.type_def.to_annotation(
+            name_to_strategy
+        )
     else:
-        # TODO:
-        # this is a reasonable default but it should be a configurable error
+        # to avoid reaching this case, configure REQUIRE_RETURN_TYPE=True
         returns = Types.NONE
-    return f'# type: ({args}) -> {returns}'
+    return f"# type: ({args}) -> {returns}"
 
 
 BUILTIN_TYPE_NAMES = {
     name
     for name in __builtins__.keys()  # type: ignore[attr-defined]
-    if not name.startswith('__') and isinstance(eval(name), type)
+    if not name.startswith("__") and isinstance(eval(name), type)
 }
 
 TYPING_TYPE_NAMES = {
@@ -109,7 +102,7 @@ def find_local_types(filename: str) -> LocalTypes:
                     names_to_modules[name] = f"{prefix}{module}"
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                if '.' not in alias.name:
+                if "." not in alias.name:
                     module = None
                     name = alias.name
                     # TODO can we assume this is never a type?
@@ -230,7 +223,7 @@ def get_import_lines(
         if _is_typing_type(name)
     }
     import_tuples.extend(
-        ('typing', name)
+        ("typing", name)
         for name in typing_types
     )
 

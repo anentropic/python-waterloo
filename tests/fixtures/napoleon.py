@@ -2,6 +2,7 @@
 Boring docstring for the module itself
 """
 import logging
+from other.module import Product
 from some.module import Imported
 if True:
     from some.module import ConditionallyImported

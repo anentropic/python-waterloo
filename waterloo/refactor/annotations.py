@@ -37,6 +37,7 @@ from waterloo.refactor.utils import (
 from waterloo.types import (
     AmbiguousTypeError,
     AmbiguousTypePolicy,
+    ImportStrategy,
     ModuleHasStarImportError,
     NameMatchesRelativeImportError,
     NotFoundNoPathError,
@@ -44,9 +45,13 @@ from waterloo.types import (
 )
 
 
+# TODO mono-quoted docstrings are a thing
+# and this is a pretty loose test
 IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
 
-threadlocals = local()  # used in bowler subprocesses only
+# used in bowler subprocesses only (not parent process)
+# for passing data between individual steps processing same source file
+threadlocals = local()
 
 
 def _init_threadlocals(filename):
@@ -70,9 +75,10 @@ def _cleanup_threadlocals():
             pass
 
 
-def record_type_name(name: str):
+def record_type_name(name: str) -> ImportStrategy:
     strategy = threadlocals.strategy_for_name(name)
     threadlocals.strategy_to_names.setdefault(strategy, set()).add(name)
+    return strategy
 
 
 class StartFile(NonMatchingFixer):
@@ -167,9 +173,10 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
 
     # record types found in this docstring
     # and warn/fail on ambiguous types according to AMBIGUOUS_TYPE_POLICY
+    name_to_strategy = {}
     for name in signature.type_names():
         try:
-            record_type_name(name)
+            name_to_strategy[name] = record_type_name(name)
         except AmbiguousTypeError as e:
             if isinstance(e, ModuleHasStarImportError):
                 fail_policies = {AmbiguousTypePolicy.FAIL}
@@ -189,7 +196,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
                 raise Interrupt
 
     # add the type comment as first line of func body (before docstring)
-    type_comment = get_type_comment(signature)
+    type_comment = get_type_comment(signature, name_to_strategy)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     threadlocals.comment_count += 1
 
@@ -273,6 +280,7 @@ def _make_bare_import_node(name: str) -> Node:
             [
                 Leaf(token.NAME, "import"),
                 Leaf(token.NAME, name, prefix=" "),
+                Newline(),
             ],
         )
 
@@ -292,7 +300,18 @@ class AddTypeImports(NonMatchingFixer):
         # introspected locals?
         imports_dict = get_import_lines(threadlocals.strategy_to_names)
         insert_pos = _find_import_pos(tree)
-        for left, right in sorted(imports_dict.items(), reverse=True):
+
+        def _sort_key(val):
+            left, right = val
+            left = left or ""
+            return (left, right)
+
+        sorted_tuples = sorted(
+            imports_dict.items(),
+            key=_sort_key,
+            reverse=True,
+        )
+        for left, right in sorted_tuples:
             if left:
                 import_node = _make_from_import_node(left, sorted(right))
                 tree.insert_child(insert_pos, import_node)
