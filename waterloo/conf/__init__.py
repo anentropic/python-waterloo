@@ -3,14 +3,18 @@ from typing import Dict, Optional, Union
 import toml
 from pydantic import BaseSettings, validator
 
-from waterloo.types import AmbiguousTypePolicy, ECHO_STYLES_REQUIRED_FIELDS
+from waterloo.types import (
+    AmbiguousTypePolicy,
+    ECHO_STYLES_REQUIRED_FIELDS,
+    Indent_T,
+)
 
 
 class ConfigModel(BaseSettings):
     class Config:
         validate_assignment = True
 
-    INDENT: str = "    "
+    INDENT: Indent_T = 4
     MAX_INDENT_LEVEL: int = 10
 
     ALLOW_UNTYPED_ARGS: bool = False
@@ -35,6 +39,12 @@ class ConfigModel(BaseSettings):
                 key in value for key in ECHO_STYLES_REQUIRED_FIELDS
             ), f"missing required keys from {ECHO_STYLES_REQUIRED_FIELDS!r}"
         return value
+
+    def indent(self) -> str:
+        if isinstance(self.INDENT, int):
+            return " " * self.INDENT
+        else:
+            return "\t"
 
 
 try:

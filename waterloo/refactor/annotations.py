@@ -178,6 +178,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
                 fail_policies = {AmbiguousTypePolicy.FAIL}
                 report_name_matches_relative_import(function, e, fail_policies)
             elif isinstance(e, NotFoundNoPathError):
+                # TODO: we may want to configurably AUTO as WARN
                 fail_policies = {AmbiguousTypePolicy.FAIL, AmbiguousTypePolicy.AUTO}
                 report_not_found_no_path(function, e, fail_policies)
             else:
@@ -337,7 +338,7 @@ def annotate(*paths: str, **execute_kwargs):
 
     # generate pattern-match for every indent level up to `max_indent_level`
     indent_patterns = "|".join(
-        "'%s'" % (settings.INDENT * i)
+        "'%s'" % (settings.indent() * i)
         for i in range(1, settings.MAX_INDENT_LEVEL + 1)
     )
 

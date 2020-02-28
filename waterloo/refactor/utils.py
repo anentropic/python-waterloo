@@ -140,7 +140,7 @@ def strategy_for_name_factory(
 
         1. primary decision table
                           | bare      | dotted path
-        not found         | warn      | add import
+        not found         | warn/fail | add import
         in locals         | use local | ? --> see 2. below
         module name found | N/A       | warn*/fail/from-style-import **
           in a * import   |           |
@@ -240,7 +240,7 @@ def get_import_lines(
     )
 
     import_tuples.extend(
-        (None, name)
+        (None, name.rsplit(".", maxsplit=1)[0])
         for name in strategies.get(ImportStrategy.ADD_DOTTED, set())
     )
 

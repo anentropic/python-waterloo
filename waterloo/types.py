@@ -12,7 +12,7 @@ from typing import (
     Tuple,
     Union,
 )
-from typing_extensions import Final
+from typing_extensions import Final, Literal
 
 
 class ArgsSection(str, Enum):
@@ -287,8 +287,8 @@ class LocalTypes:
 
 class ImportStrategy(Enum):
     USE_EXISTING = auto()  # don't add any import
-    ADD_FROM = auto()
-    ADD_DOTTED = auto()
+    ADD_FROM = auto()  # from <dotted.package.path> import <name list>
+    ADD_DOTTED = auto()  # import <dotted.package.path>
 
 
 class AmbiguousTypeError(Exception):
@@ -308,12 +308,18 @@ class NameMatchesRelativeImportError(AmbiguousTypeError):
 
 
 class AmbiguousTypePolicy(Enum):
-    AUTO = auto()  # warn, don't-annotate or import, depending the case
+    AUTO = auto()  # warn, don't-annotate, or import, depending on the case
     WARN = auto()  # annotate but don't add import, show warning
     FAIL = auto()  # don't annotate, show error
 
 
 ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
+
+Indent_T = Union[
+    Literal["t"],
+    Literal["T"],
+    int
+]
 
 PRINTABLE_SETTINGS: Final = {
     'INDENT',
