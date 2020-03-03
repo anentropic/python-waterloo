@@ -1,8 +1,9 @@
-import ast
 import typing
 from enum import Enum, auto
 from itertools import chain
-from typing import cast, Callable, Dict, List, Optional, Set, Tuple
+from typing import cast, Callable, Dict, Generator, List, Optional, Set, Tuple
+
+import parso
 
 from waterloo.conf import settings
 from waterloo.types import (
@@ -82,36 +83,49 @@ def _is_dotted_path(name: str) -> bool:
     return '.' in name and name != Types.ELLIPSIS
 
 
+def walk_tree(
+    node: parso.tree.NodeOrLeaf
+) -> Generator[parso.tree.NodeOrLeaf, None, None]:
+    if hasattr(node, 'children'):
+        yield node
+        for child in node.children:
+            for subchild in walk_tree(child):
+                yield subchild
+    else:
+        yield node
+
+
 def find_local_types(filename: str) -> LocalTypes:
+    """
+    TODO: parso understands scopes so we could feasibly
+    determine visibility of non-top-level classdefs and imports
+    (currently we find defs at all levels)
+    """
+    grammar = parso.load_grammar(version=settings.PYTHON_VERSION)
     with open(filename) as f:
-        tree = ast.parse(f.read(), filename=filename)
+        tree = grammar.parse(f.read(), path=filename)
     class_defs = set()
     star_imports = set()
     names_to_modules = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            class_defs.add(node.name)
-        elif isinstance(node, ast.ImportFrom):
-            for alias in node.names:
-                prefix = "." * node.level
-                module = node.module or ""
-                name = alias.asname or alias.name
-                if name == "*":
-                    star_imports.add(f"{prefix}{module}")
-                else:
-                    names_to_modules[name] = f"{prefix}{module}"
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                if "." not in alias.name:
-                    module = None
-                    name = alias.name
-                    # TODO can we assume this is never a type?
-                else:
-                    module, name = alias.name.rsplit('.', maxsplit=1)
-                if alias.asname:
-                    names_to_modules[alias.asname] = module
-                else:
-                    names_to_modules[name] = module
+    for node in walk_tree(tree):
+        if isinstance(node, parso.python.tree.Class):
+            class_defs.add(node.name.value)
+        elif isinstance(node, parso.python.tree.ImportFrom):
+            prefix = "." * node.level
+            module = ".".join(name.value for name in node.get_from_names())
+            if node.is_star_import():
+                star_imports.add(f"{prefix}{module}")
+            else:
+                for name in node.get_defined_names():
+                    names_to_modules[name.value] = f"{prefix}{module}"
+        elif isinstance(node, parso.python.tree.ImportName):
+            paths = node.get_paths()[0]
+            name = paths[-1].value
+            if len(paths) > 1:
+                module = ".".join(path.value for path in paths[:-1])
+            else:
+                module = None
+            names_to_modules[name] = module
     return LocalTypes.factory(
         class_defs=class_defs,
         star_imports=star_imports,

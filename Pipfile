@@ -12,12 +12,13 @@ pytype = {version = "*",markers = "python_version = '3.7'"}
 
 [packages]
 megaparsy = "*"
-bowler = "*"
 prompt-toolkit = "*"
 toml = "*"
 regex = "*"
 pydantic = "*"
 typing-extensions = "*"
+bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post1"}
+parso = "*"
 
 [requires]
 python_version = ">=3.7"

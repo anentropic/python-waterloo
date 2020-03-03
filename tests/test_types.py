@@ -81,6 +81,7 @@ def test_type_atom_to_annotation(expected, example):
      ])),
 ])
 def test_type_atom_to_annotation_fix_dotted_paths(expected, example):
+    # TODO: name_to_strategy
     assert example.to_annotation(True) == expected
 
 

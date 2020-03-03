@@ -54,11 +54,14 @@ setup(
     python_requires='~=3.7',
     install_requires=[
         'megaparsy>=0.1.4,<0.2.0',
-        'bowler>=0.8.0,<0.9.0',
+        'bowler==0.8.0-post1',
         'prompt-toolkit>=3.0.0,<3.1.0',
         'typesystem>=0.2.4,<0.3.0',
         'toml>=0.10.0,<0.11.0',
         'regex>=2020.2.20',
+    ],
+    dependency_links=[
+        'https://github.com/anentropic/Bowler/tarball/0.8.0-post1#egg=bowler-0.8.0-post1',
     ],
 
     packages=[

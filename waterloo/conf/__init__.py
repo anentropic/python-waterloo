@@ -6,16 +6,15 @@ from pydantic import BaseSettings, validator
 from waterloo.types import (
     AmbiguousTypePolicy,
     ECHO_STYLES_REQUIRED_FIELDS,
-    Indent_T,
 )
 
 
 class ConfigModel(BaseSettings):
     class Config:
         validate_assignment = True
+        env_prefix = 'WATERLOO_'
 
-    INDENT: Indent_T = 4
-    MAX_INDENT_LEVEL: int = 10
+    PYTHON_VERSION: str = "2.7"
 
     ALLOW_UNTYPED_ARGS: bool = False
     REQUIRE_RETURN_TYPE: bool = False

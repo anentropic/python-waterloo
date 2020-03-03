@@ -280,6 +280,18 @@ class LocalTypes:
     all_names: Set[str]
 
     @classmethod
+    def empty(cls) -> 'LocalTypes':
+        return cls(
+            class_defs=set(),
+            star_imports=set(),
+            names_to_modules={},
+            all_names=set(),
+        )
+
+    def update_all_names(self):
+        self.all_names.update(self.class_defs | self.names_to_modules.keys())
+
+    @classmethod
     def factory(
         cls,
         class_defs: Set[str],

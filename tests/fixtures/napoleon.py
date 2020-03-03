@@ -2,6 +2,9 @@
 Boring docstring for the module itself
 """
 import logging
+import nott.so.serious
+from ..sub import Irrelevant, Nonsense, Unused as ReallyUnused
+from serious import *
 from other.module import Product
 from some.module import Imported
 if True:
@@ -31,6 +34,8 @@ def first(products, getter):
         Dict[int, List[ConditionallyImported]]: {<product id>: <product videos>}
     """
     from some.module import InnerImported
+    print "Python 2 print statement"
+    print("parenthesised print statement")
     return {}
 
 
@@ -52,7 +57,7 @@ def second(products, getter):
         whatever
     """
     class InnerClass(object):
-        pass
+        raise ValueError, "WTF python 2"
 
     def second_inner(product, key, default):
         """
@@ -67,6 +72,11 @@ def second(products, getter):
         """
         pass
 
+    try:
+        third([], 1)
+    except ValueError, e:
+        # disgusting Python 2.5 exception format
+        pass
     return {}
 
 

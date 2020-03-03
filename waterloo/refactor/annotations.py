@@ -1,4 +1,3 @@
-import re
 from enum import Enum
 from threading import local
 from typing import Sequence
@@ -44,10 +43,6 @@ from waterloo.types import (
     PRINTABLE_SETTINGS,
 )
 
-
-# TODO mono-quoted docstrings are a thing
-# and this is a pretty loose test
-IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
 
 # used in bowler subprocesses only (not parent process)
 # for passing data between individual steps processing same source file
@@ -115,23 +110,7 @@ def f_not_already_annotated_py2(
     have used an alternation pattern (see `annotate_file` below) otherwise
     it would be a single node.
     """
-    return '# type:' not in capture['initial_indent_node'][0].prefix
-
-
-def f_has_docstring(node: LN, capture: Capture, filename: Filename) -> bool:
-    """
-    (filter)
-
-    Filter out functions which don't have a docstring that we could parse
-    for annotations.
-    """
-    try:
-        docstring_node = capture['docstring_parent_node'].children[0]
-        result = bool(IS_DOCSTRING_RE.search(docstring_node.value))
-    except (AttributeError, IndexError):
-        return False
-    capture['docstring_node'] = docstring_node
-    return result
+    return '# type:' not in capture['initial_indent_node'].prefix
 
 
 @interrupt_modifier
@@ -145,7 +124,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     threadlocals.docstring_count += 1
     # since we filtered for funcs with a docstring, the initial_indent_node
     # should be the indent before the start of the docstring quotes.
-    initial_indent = capture['initial_indent_node'][0]
+    initial_indent = capture['initial_indent_node']
     function = capture['function_name']
 
     try:
@@ -158,6 +137,8 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
         raise Interrupt
 
     # are we okay to annotate?
+    # TODO these are currently WARN/FAIL... maybe should be OK/WARN/FAIL
+    # configurably, like for amibiguous types
     if not signature.arg_types.is_fully_typed:
         report_incomplete_arg_types(function)
         if not settings.ALLOW_UNTYPED_ARGS:
@@ -355,28 +336,22 @@ def annotate(*paths: str, **execute_kwargs):
             echo.debug(f"- {key}: <b>{val}</b>")
     echo.debug("")
 
-    # generate pattern-match for every indent level up to `max_indent_level`
-    indent_patterns = "|".join(
-        "'%s'" % (settings.indent() * i)
-        for i in range(1, settings.MAX_INDENT_LEVEL + 1)
-    )
-
     q = (
-        WaterlooQuery(*paths)
-        .select(
-            r"""
-            funcdef<
+        WaterlooQuery(
+            *paths,
+            python_version=str(settings.PYTHON_VERSION).split(".", 1)[0],
+        )
+        .select(r"""
+            funcdef <
                 'def' function_name=any
                 any* ':'
-                suite< '\n'
-                    initial_indent_node=(%s)
-                    docstring_parent_node=simple_stmt< any* >
+                suite < '\n'
+                    initial_indent_node=any
+                    simple_stmt < docstring_node=STRING any* >
                     any*
                 >
             >
-            """ % indent_patterns
-        )
-        .filter(f_has_docstring)
+        """)
         .filter(f_not_already_annotated_py2)
         .modify(m_add_type_comment)
         .raw_fixer(StartFile)

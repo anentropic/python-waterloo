@@ -58,8 +58,6 @@ positional arguments:
 
 | arg  | description |
 | ------------- | ------------- |
-|  `--indent INDENT` | Due to multi-process architecture of the underlying Bowler refactoring tool we are unable to detect indents before processing each file. So specify your project's base indent as `t\|T` for tab or `2\|4\|etc` for no of spaces. (If you have multiple indent styles in your project, do separate annotation runs for each group of files. _Then think about your life choices..._) (default: `4`) |
-| `--max-indent-level MAX_INDENT_LEVEL` | We have to generate pattern-matching indents in order to annotate functions, this is how many levels of indentation to generate matches for (indents larger than this will not be detected). (default: `10`) |
 | `-aa, --allow-untyped-args` | If any args or return types are found in docstring we can attempt to output a type annotation. If arg types are missing or incomplete, default behaviour is to raise an error. If this flag is set we will instead output an annotation like `(...) -> returnT` which mypy will treat as if all args are `Any`. (default: `False`) |
 | `-rr, --require-return-type` | If any args or return types are found in docstring we can attempt to output a type annotation. If the return type is missing our default behaviour is to assume function should be annotated as returning `-> None`. If this flag is set we will instead raise an error. (default: `False`) |
 | `-w, --write` | Whether to apply the changes to target files. Without this flag set waterloo will just perform a 'dry run'. (default: `False`) |
@@ -71,11 +69,24 @@ positional arguments:
 You can also define a `waterloo.toml` file in the root of your project to provide your own defaults to some of these options:
 
 ```toml
+python_version = 3
 indent = 2
 max_indent_level = 15
 
 allow_untyped_args = false
 require_return_type = true
+```
+
+**Environment vars**
+
+You can also provide config defaults via environment variables, e.g.:
+```bash
+WATERLOO_PYTHON_VERSION=3
+WATERLOO_INDENT=2
+WATERLOO_MAX_INDENT_LEVEL=15
+
+WATERLOO_ALLOW_UNTYPED_ARGS=false
+WATERLOO_REQUIRE_RETURN_TYPE=true
 ```
 
 ### Upgrading your project to Python 3

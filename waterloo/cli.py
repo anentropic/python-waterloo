@@ -36,30 +36,24 @@ def main():
         help='List of file or directory paths to process.',
     )
 
-    indent_group = annotate_cmd.add_argument_group('indentation options')
-    indent_group.add_argument(
-        '--indent', type=str,
-        default=settings.INDENT,
-        help="Due to multi-process architecture of the underlying Bowler "
-        "refactoring tool we are unable to detect indents before processing "
-        "each file. So specify your project's base indent as [tT] for tab or "
-        "2|4|etc for no of spaces. (If you have multiple indent styles, do "
-        "separate runs for each group of files, then think about your life "
-        "choices...)"
-    )
-    indent_group.add_argument(
-        '--max-indent-level', type=int,
-        default=settings.MAX_INDENT_LEVEL,
-        help="We have to generate pattern-matching indents in order to "
-        "annotate functions, this is how many indent levels to generate "
-        "matches for (indents larger than this will not be detected).",
+    general_group = annotate_cmd.add_argument_group('general options')
+    general_group.add_argument(
+        '-p', '--python-version', type=str,
+        default=settings.PYTHON_VERSION,
+        help="We can refactor either Python 2 or Python 3 source files but "
+        "the underlying bowler+fissix libraries need to know which grammar "
+        "to use (to know if `print` is a statement or a function). In Py2 "
+        "mode, `print` will be auto-detected based on whether a `from "
+        "__future__ import print_function` is found. For Py3 files `print` "
+        "can only be a function. We also use `parso` library which can "
+        "benefit from knowing <major>.<minor> version of your sources."
     )
 
     annotation_group = annotate_cmd.add_argument_group('annotation options')
     annotation_group.add_argument(
         '-aa', '--allow-untyped-args', action='store_true',
         default=settings.ALLOW_UNTYPED_ARGS,
-        help="If any args or return types are found in docstring we can "
+        help="If any args or return types are found in the docstring we can "
         "attempt to output a type annotation. If arg types are missing or "
         "incomplete, default behaviour is to raise an error. If this flag "
         "is set we will instead output an annotation like `(...) -> returnT` "
@@ -68,7 +62,7 @@ def main():
     annotation_group.add_argument(
         '-rr', '--require-return-type', action='store_true',
         default=settings.REQUIRE_RETURN_TYPE,
-        help="If any args or return types are found in docstring we can "
+        help="If any args or return types are found in the docstring we can "
         "attempt to output a type annotation. If the return type is missing "
         "our default behaviour is to assume function should be annotated as "
         "returning `-> None`. If this flag is set we will instead raise an "
@@ -82,12 +76,12 @@ def main():
         "appropriate import to add, or it is ambiguous whether one is needed. "
         "If you have given a dotted-path to the type in your docstring then "
         "when policy is AUTO we will annotate and add import with no warning. "
-        "In cases where there is a matching `from package import *`, or a "
+        "(In cases where there is a matching `from package import *`, or a "
         "relative import of same type name, then this can lead to redundant "
-        "imports. WARN option will annotate without adding an import in these "
+        "imports). WARN option will annotate without adding imports in these "
         "cases, while FAIL will print an error and won't add any annotation. "
         "If you haven't given a dotted path to types then AUTO will behave as "
-        "FAIL, while WARN will add an annotation without adding an import as "
+        "FAIL, while WARN will add an annotation without adding an import, as "
         "per above."
     )
 
@@ -112,8 +106,7 @@ def main():
         print(__version__)
         return
 
-    settings.INDENT = args.indent
-    settings.MAX_INDENT_LEVEL = args.max_indent_level
+    settings.PYTHON_VERSION = args.python_version
     settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
     settings.REQUIRE_RETURN_TYPE = args.require_return_type
     settings.AMBIGUOUS_TYPE_POLICY = args.ambiguous_type_policy
