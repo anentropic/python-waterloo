@@ -11,9 +11,8 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Union,
 )
-from typing_extensions import Final, Literal
+from typing_extensions import Final
 
 
 class ArgsSection(str, Enum):
@@ -91,6 +90,10 @@ def _repr_type_arg(val, name_to_strategy: Optional[NameToStrategy_T]) -> str:
 
 @_repr_type_arg.register
 def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    """
+    By default we will strip dotted package prefix from type name,
+    unless we find ImportStrategy.ADD_DOTTED
+    """
     # `val` is the name from TypeAtom
     if (
         val != Types.ELLIPSIS and
@@ -352,12 +355,6 @@ class AmbiguousTypePolicy(Enum):
 
 
 ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
-
-Indent_T = Union[
-    Literal["t"],
-    Literal["T"],
-    int
-]
 
 PRINTABLE_SETTINGS: Final = {
     'INDENT',

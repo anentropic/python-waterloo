@@ -219,7 +219,7 @@ def strategy_for_name_factory(
 
 def get_import_lines(
     strategies: Dict[ImportStrategy, Set[str]]
-) -> Dict[str, Set[str]]:
+) -> Dict[Optional[str], Set[str]]:
     """
     This is best-effort... if you haven't used dotted paths when defining your
     docstring types then we will likely be missing imports needed for mypy

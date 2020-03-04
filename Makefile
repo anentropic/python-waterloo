@@ -14,7 +14,7 @@ shell:
 	PYTHONPATH=waterloo:tests:$$PYTHONPATH ipython
 
 typecheck:
-	pytype waterloo
+	pytype -V 3.7 waterloo
 
 pytest:
 	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/
