@@ -348,18 +348,23 @@ class NameMatchesRelativeImportError(AmbiguousTypeError):
     pass
 
 
-class AmbiguousTypePolicy(Enum):
-    AUTO = auto()  # warn, don't-annotate, or import, depending on the case
-    WARN = auto()  # annotate but don't add import, show warning
+class ImportCollisionPolicy(Enum):
+    IMPORT = auto()  # annotate and add an import, no warning
+    NO_IMPORT = auto()  # annotate but don't add import, show warning
+    FAIL = auto()  # don't annotate, show error
+
+
+class UnpathedTypePolicy(Enum):
+    IGNORE = auto()  # annotate as documented (may not work), no warning
+    WARN = auto()  # annotate as documented (may not work), show warning
     FAIL = auto()  # don't annotate, show error
 
 
 ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
 
 PRINTABLE_SETTINGS: Final = {
-    'INDENT',
-    'MAX_INDENT_LEVEL',
     'ALLOW_UNTYPED_ARGS',
     'REQUIRE_RETURN_TYPE',
-    'AMBIGUOUS_TYPE_POLICY',
+    'IMPORT_COLLISION_POLICY',
+    'UNPATHED_TYPE_POLICY',
 }

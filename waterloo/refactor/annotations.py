@@ -35,12 +35,13 @@ from waterloo.refactor.utils import (
 )
 from waterloo.types import (
     AmbiguousTypeError,
-    AmbiguousTypePolicy,
+    ImportCollisionPolicy,
     ImportStrategy,
     ModuleHasStarImportError,
     NameMatchesRelativeImportError,
     NotFoundNoPathError,
     PRINTABLE_SETTINGS,
+    UnpathedTypePolicy,
 )
 
 
@@ -153,28 +154,31 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     threadlocals.typed_docstring_count += 1
 
     # record types found in this docstring
-    # and warn/fail on ambiguous types according to AMBIGUOUS_TYPE_POLICY
+    # and warn/fail on ambiguous types according to IMPORT_COLLISION_POLICY
     name_to_strategy = {}
     for name in signature.type_names():
         try:
             name_to_strategy[name] = record_type_name(name)
         except AmbiguousTypeError as e:
             if isinstance(e, ModuleHasStarImportError):
-                fail_policies = {AmbiguousTypePolicy.FAIL}
+                fail_policies = {ImportCollisionPolicy.FAIL}
                 report_module_has_star_import(function, e, fail_policies)
+                if settings.IMPORT_COLLISION_POLICY in fail_policies:
+                    raise Interrupt
             elif isinstance(e, NameMatchesRelativeImportError):
-                fail_policies = {AmbiguousTypePolicy.FAIL}
+                fail_policies = {ImportCollisionPolicy.FAIL}
                 report_name_matches_relative_import(function, e, fail_policies)
+                if settings.IMPORT_COLLISION_POLICY in fail_policies:
+                    raise Interrupt
             elif isinstance(e, NotFoundNoPathError):
-                # TODO: we may want to configurably AUTO as WARN
-                fail_policies = {AmbiguousTypePolicy.FAIL, AmbiguousTypePolicy.AUTO}
+                fail_policies = {UnpathedTypePolicy.FAIL}
                 report_not_found_no_path(function, e, fail_policies)
+                if settings.UNPATHED_TYPE_POLICY in fail_policies:
+                    raise Interrupt
             else:
                 raise ValueError(
                     f"Unexpected AmbiguousTypeError: {e!r}"
                 )
-            if settings.AMBIGUOUS_TYPE_POLICY in fail_policies:
-                raise Interrupt
 
     # add the type comment as first line of func body (before docstring)
     type_comment = get_type_comment(signature, name_to_strategy)

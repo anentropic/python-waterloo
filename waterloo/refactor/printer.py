@@ -5,10 +5,11 @@ from bowler import Capture
 
 from waterloo.conf import settings
 from waterloo.types import (
-    AmbiguousTypePolicy,
+    ImportCollisionPolicy,
     ModuleHasStarImportError,
     NameMatchesRelativeImportError,
     NotFoundNoPathError,
+    UnpathedTypePolicy,
 )
 from waterloo.utils import StylePrinter
 
@@ -54,7 +55,7 @@ def report_incomplete_return_type(function: Capture):
 def report_module_has_star_import(
     function: Capture,
     e: ModuleHasStarImportError,
-    fail_policies: Set[AmbiguousTypePolicy],
+    fail_policies: Set[ImportCollisionPolicy],
 ):
     t_module, t_name = e.args
     assert t_module
@@ -62,29 +63,29 @@ def report_module_has_star_import(
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{t_module}.{t_name}</b> in docstring for <b>def {function.value}</b> "
         f"matches \"from {t_module} import *\" but we don't know if \"{t_name}\" is in *."
     )
-    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.WARN:
+    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.NO_IMPORT:
         echo.warning(
             f"⚠️  {msg}\n"
             f"   ➤ annotation added: will assume existing import is sufficient\n"
-            f"   ➤ if you would like a specific import to be added, undo this change and re-run with AmbiguousTypePolicy.AUTO"
+            f"   ➤ if you would like a specific import to be added, undo this change and re-run with ImportCollisionPolicy.IMPORT"
         )
-    elif settings.AMBIGUOUS_TYPE_POLICY in fail_policies:
+    elif settings.IMPORT_COLLISION_POLICY in fail_policies:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"
-            f"   ➤ if you would like an import and annotation to be added, re-run with AmbiguousTypePolicy.AUTO"
+            f"   ➤ if you would like an import and annotation to be added, re-run with ImportCollisionPolicy.IMPORT"
         )
     else:
         raise ValueError(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
-            f"AMBIGUOUS_TYPE_POLICY={settings.AMBIGUOUS_TYPE_POLICY.name}"
+            f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
         )
 
 
 def report_name_matches_relative_import(
     function: Capture,
     e: NameMatchesRelativeImportError,
-    fail_policies: Set[AmbiguousTypePolicy],
+    fail_policies: Set[ImportCollisionPolicy],
 ):
     t_module, t_name = e.args
     type_path = f"{t_module}.{t_name}" if t_module else t_name
@@ -92,29 +93,29 @@ def report_name_matches_relative_import(
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{type_path}</b> in docstring for <b>def {function.value}</b> "
         f"matches a \"{t_name}\" imported from a relative path, but we don't know if it is the same."
     )
-    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.WARN:
+    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.NO_IMPORT:
         echo.warning(
             f"⚠️  {msg}\n"
             f"   ➤ annotation added: will assume existing import is sufficient\n"
-            f"   ➤ if you would like a specific import to be added, undo this change and re-run with AmbiguousTypePolicy.AUTO"
+            f"   ➤ if you would like a specific import to be added, undo this change and re-run with ImportCollisionPolicy.IMPORT"
         )
-    elif settings.AMBIGUOUS_TYPE_POLICY in fail_policies:
+    elif settings.IMPORT_COLLISION_POLICY in fail_policies:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"
-            f"   ➤ if you would like an import and annotation to be added, re-run with AmbiguousTypePolicy.AUTO"
+            f"   ➤ if you would like an import and annotation to be added, re-run with ImportCollisionPolicy.IMPORT"
         )
     else:
         raise ValueError(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
-            f"AMBIGUOUS_TYPE_POLICY={settings.AMBIGUOUS_TYPE_POLICY.name}"
+            f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
         )
 
 
 def report_not_found_no_path(
     function: Capture,
     e: NotFoundNoPathError,
-    fail_policies: Set[AmbiguousTypePolicy],
+    fail_policies: Set[UnpathedTypePolicy],
 ):
     _, t_name = e.args
     msg = (
@@ -123,19 +124,19 @@ def report_not_found_no_path(
         f"a dotted-path we can use to add an import statement. However there are some forms we cannot auto-detect "
         f"which may mean no import is needed."
     )
-    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.WARN:
+    if settings.UNPATHED_TYPE_POLICY is UnpathedTypePolicy.WARN:
         echo.warning(
             f"⚠️  {msg}\n"
             f"   ➤ annotation added: will assume no import needed"
         )
-    elif settings.AMBIGUOUS_TYPE_POLICY in fail_policies:
+    elif settings.UNPATHED_TYPE_POLICY in fail_policies:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"
-            f"   ➤ if you would like an annotation to be added (without auto-added import), re-run with AmbiguousTypePolicy.WARN"
+            f"   ➤ if you would like an annotation to be added (without accompanying import), re-run with UnpathedTypePolicy.WARN|IGNORE"
         )
     else:
         raise ValueError(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
-            f"AMBIGUOUS_TYPE_POLICY={settings.AMBIGUOUS_TYPE_POLICY.name}"
+            f"UNPATHED_TYPE_POLICY={settings.UNPATHED_TYPE_POLICY.name}"
         )

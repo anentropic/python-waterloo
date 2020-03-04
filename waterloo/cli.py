@@ -3,7 +3,7 @@ import argparse
 from waterloo.__about__ import __version__
 from waterloo.conf import settings
 from waterloo.refactor import annotate
-from waterloo.types import AmbiguousTypePolicy
+from waterloo.types import ImportCollisionPolicy, UnpathedTypePolicy
 
 
 def main():
@@ -69,20 +69,30 @@ def main():
         "error."
     )
     annotation_group.add_argument(
-        '-tp', '--ambiguous-type-policy',
-        default=settings.AMBIGUOUS_TYPE_POLICY.name,
-        choices=[m.name for m in AmbiguousTypePolicy],
-        help="There are some cases where we either cannot determine an "
-        "appropriate import to add, or it is ambiguous whether one is needed. "
-        "If you have given a dotted-path to the type in your docstring then "
-        "when policy is AUTO we will annotate and add import with no warning. "
-        "(In cases where there is a matching `from package import *`, or a "
-        "relative import of same type name, then this can lead to redundant "
-        "imports). WARN option will annotate without adding imports in these "
-        "cases, while FAIL will print an error and won't add any annotation. "
-        "If you haven't given a dotted path to types then AUTO will behave as "
-        "FAIL, while WARN will add an annotation without adding an import, as "
-        "per above."
+        '-ic', '--import-collision-policy',
+        default=settings.IMPORT_COLLISION_POLICY.name,
+        choices=[m.name for m in ImportCollisionPolicy],
+        help="There are some cases where it is ambiguous whether we need to "
+        "add an import for your documented type. This can occur if you gave "
+        "a dotted package path but there is already a matching `from package "
+        "import *`, or a relative import of same type name. In both cases it "
+        "is safest for us to add a new specific import for your type, but it "
+        "may be redundant. The default option IMPORT will add imports. The "
+        "NO_IMPORT option will annotate without adding imports, and will also "
+        "show a warning message. FAIL will print an error and won't add any "
+        "annotation."
+    )
+    annotation_group.add_argument(
+        '-up', '--unpathed-type-policy',
+        default=settings.UNPATHED_TYPE_POLICY.name,
+        choices=[m.name for m in UnpathedTypePolicy],
+        help="There are some cases where we cannot determine an appropriate "
+        "import to add - when your types do not have a dotted path and we "
+        "can't find a matching type in builtins, typing package or locals. "
+        "When policy is IGNORE we will annotate as documented, you will need "
+        "to resolve any errors raised by mypy manually. WARN option will "
+        "annotate as documented but also display a warning. FAIL will print "
+        "an error and won't add any annotation."
     )
 
     apply_group = annotate_cmd.add_argument_group('apply options')
@@ -109,7 +119,8 @@ def main():
     settings.PYTHON_VERSION = args.python_version
     settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
     settings.REQUIRE_RETURN_TYPE = args.require_return_type
-    settings.AMBIGUOUS_TYPE_POLICY = args.ambiguous_type_policy
+    settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
+    settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
 
     annotate(
         *args.files,

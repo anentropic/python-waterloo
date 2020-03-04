@@ -5,8 +5,9 @@ import toml
 from pydantic import BaseSettings, validator
 
 from waterloo.types import (
-    AmbiguousTypePolicy,
     ECHO_STYLES_REQUIRED_FIELDS,
+    ImportCollisionPolicy,
+    UnpathedTypePolicy,
 )
 
 
@@ -36,17 +37,18 @@ class ConfigModel(CoerceEnumSettings):
     ALLOW_UNTYPED_ARGS: bool = False
     REQUIRE_RETURN_TYPE: bool = False
 
-    AMBIGUOUS_TYPE_POLICY: AmbiguousTypePolicy = AmbiguousTypePolicy.AUTO
+    IMPORT_COLLISION_POLICY: ImportCollisionPolicy = ImportCollisionPolicy.IMPORT
+    UNPATHED_TYPE_POLICY: UnpathedTypePolicy = UnpathedTypePolicy.FAIL
 
     ECHO_STYLES: Optional[Dict[str, str]] = None
 
-    @validator('AMBIGUOUS_TYPE_POLICY')
+    @validator('IMPORT_COLLISION_POLICY')
     def key_to_member(
-        cls, value: Union[AmbiguousTypePolicy, str]
-    ) -> AmbiguousTypePolicy:
-        if isinstance(value, AmbiguousTypePolicy):
+        cls, value: Union[ImportCollisionPolicy, str]
+    ) -> ImportCollisionPolicy:
+        if isinstance(value, ImportCollisionPolicy):
             return value
-        return AmbiguousTypePolicy[value]
+        return ImportCollisionPolicy[value]
 
     @validator('ECHO_STYLES')
     def echo_styles_required_fields(

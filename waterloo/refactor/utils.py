@@ -7,7 +7,7 @@ import parso
 
 from waterloo.conf import settings
 from waterloo.types import (
-    AmbiguousTypePolicy,
+    ImportCollisionPolicy,
     ImportStrategy,
     LocalTypes,
     ModuleHasStarImportError,
@@ -177,7 +177,7 @@ def strategy_for_name_factory(
                     # "can't tell"
                     # we have a full path so we could add an import
                     # but it may be duplicating something already imported
-                    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.AUTO:
+                    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
                         # the name was maybe already in scope but it's safe
                         # to add a specific import as well
                         return ImportStrategy.ADD_DOTTED
@@ -195,7 +195,7 @@ def strategy_for_name_factory(
                 # and `__all__` could break both of these assumptions
                 # So... we treat any matching * import as AMBIGUOUS
                 if module in local_types.star_imports:
-                    if settings.AMBIGUOUS_TYPE_POLICY is AmbiguousTypePolicy.AUTO:
+                    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
                         # the name was maybe already in scope but it's safe
                         # to add a specific import as well
                         return ImportStrategy.ADD_FROM
