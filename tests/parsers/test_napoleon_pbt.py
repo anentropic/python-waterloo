@@ -72,7 +72,9 @@ def test_invalid_returns_head(example):
 
 @given(
     splat=st.text('*', min_size=0, max_size=4),
-    name=strategies.strip_whitespace_f(min_size=0, max_size=10),
+    name=strategies.strip_whitespace_f(
+        blacklist_characters="\n\r*", min_size=0, max_size=10
+    ),
     trailing_ws=strategies.whitespace_f(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
