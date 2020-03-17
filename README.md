@@ -15,7 +15,8 @@ For an example of the format see https://github.com/anentropic/python-waterloo/b
 
 ### Installation
 
-Waterloo itself requires Python 3.6 or later, but is designed for projects still on Python 2.7.
+Waterloo itself requires Python 3.7 or later, but is primarily designed for projects having Python 2.7 source files.
+(It can be run on Python 3 source files too, but since we add type-comments you will want to run the [comm2ann](https://github.com/ilevkivskyi/com2ann) tool afterwards to migrate those to Py3 annotations).
 
 For this reason it is best installed using [pipx](https://github.com/pipxproject/pipx):
 
@@ -45,21 +46,24 @@ waterloo annotate my-project-dir/ --show-diff
 ### CLI options
 
 ```
-waterloo annotate [-h] [--indent INDENT]
-                       [--max-indent-level MAX_INDENT_LEVEL] [-aa] [-rr] [-w]
-                       [-s] [-i]
-                       F [F ...]
+usage: waterloo annotate [-h] [-p PYTHON_VERSION] [-aa] [-rr]
+                         [-ic {IMPORT,NO_IMPORT,FAIL}] [-up {IGNORE,WARN,FAIL}]
+                         [-w] [-s] [-i]
+                         F [F ...]
 
 positional arguments:
-  F                    List of file or directory paths to process.
+  F                     List of file or directory paths to process.
 ```
 
 **options:**
 
 | arg  | description |
 | ------------- | ------------- |
+| `-p --python-version` | We can refactor either Python 2 or Python 3 source files but the underlying bowler+fissix libraries need to know which grammar to use (to know if `print` is a statement or a function). In Py2 mode, `print` will be auto-detected based on whether a `from __future__ import print_function` is found. For Py3 files `print` can only be a function. We also use `parso` library which can benefit from knowing `<major>.<minor>` version of your sources. (default: `2.7`) |
 | `-aa, --allow-untyped-args` | If any args or return types are found in docstring we can attempt to output a type annotation. If arg types are missing or incomplete, default behaviour is to raise an error. If this flag is set we will instead output an annotation like `(...) -> returnT` which mypy will treat as if all args are `Any`. (default: `False`) |
 | `-rr, --require-return-type` | If any args or return types are found in docstring we can attempt to output a type annotation. If the return type is missing our default behaviour is to assume function should be annotated as returning `-> None`. If this flag is set we will instead raise an error. (default: `False`) |
+| `-ic --import-collision-policy {IMPORT,NO_IMPORT,FAIL}` | There are some cases where it is ambiguous whether we need to add an import for your documented type. This can occur if you gave a dotted package path but there is already a matching `from package import *`, or a relative import of same type name. In both cases it is safest for us to add a new specific import for your type, but it may be redundant. The default option `IMPORT` will add imports. The `NO_IMPORT` option will annotate without adding imports, and will also show a warning message. FAIL will print an error and won't add any annotation. (default: `IMPORT`) |
+| `-up --unpathed-type-policy {IGNORE,WARN,FAIL}` | There are some cases where we cannot determine an appropriate import to add - when your types do not have a dotted path and we can't find a matching type in builtins, typing package or locals. When policy is `IGNORE` we will annotate as documented, you will need to resolve any errors raised by mypy manually. `WARN`option will annotate as documented but also display a warning. `FAIL` will print an error and won't add any annotation. (default: `FAIL`) |
 | `-w, --write` | Whether to apply the changes to target files. Without this flag set waterloo will just perform a 'dry run'. (default: `False`) |
 | `-s, --show-diff` | Whether to print the hunk diffs to be applied. (default: `False`) |
 | `-i, --interactive` | Whether to prompt about applying each diff hunk. (default: `False`) |
@@ -70,11 +74,11 @@ You can also define a `waterloo.toml` file in the root of your project to provid
 
 ```toml
 python_version = 3
-indent = 2
-max_indent_level = 15
 
 allow_untyped_args = false
 require_return_type = true
+unpathed_type_policy = IGNORE
+import_collision_policy = FAIL
 ```
 
 **Environment vars**
@@ -82,11 +86,11 @@ require_return_type = true
 You can also provide config defaults via environment variables, e.g.:
 ```bash
 WATERLOO_PYTHON_VERSION=3
-WATERLOO_INDENT=2
-WATERLOO_MAX_INDENT_LEVEL=15
 
 WATERLOO_ALLOW_UNTYPED_ARGS=false
 WATERLOO_REQUIRE_RETURN_TYPE=true
+UNPATHED_TYPE_POLICY=IGNORE
+IMPORT_COLLISION_POLICY=FAIL
 ```
 
 ### Upgrading your project to Python 3

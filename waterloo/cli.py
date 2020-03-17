@@ -118,18 +118,20 @@ def main(settings):
     if args.subparser == "version":
         print(__version__)
         return
+    elif args.subparser == "annotate":
+        settings.PYTHON_VERSION = args.python_version
+        settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
+        settings.REQUIRE_RETURN_TYPE = args.require_return_type
+        settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
+        settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
 
-    settings.PYTHON_VERSION = args.python_version
-    settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
-    settings.REQUIRE_RETURN_TYPE = args.require_return_type
-    settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
-    settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
+        inject.clear_and_configure(configuration_factory(settings))
 
-    inject.clear_and_configure(configuration_factory(settings))
-
-    annotate(
-        *args.files,
-        interactive=args.interactive,
-        write=args.write,
-        silent=not args.show_diff,
-    )
+        annotate(
+            *args.files,
+            interactive=args.interactive,
+            write=args.write,
+            silent=not args.show_diff,
+        )
+    else:
+        parser.print_usage()
