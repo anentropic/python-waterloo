@@ -3,6 +3,7 @@ import re
 from collections import OrderedDict
 from functools import partial
 
+import parsy
 from megaparsy import char
 from megaparsy.char.lexer import (
     indent_block,
@@ -13,7 +14,7 @@ from megaparsy.char.lexer import (
     line_fold,
 )
 from megaparsy.control.applicative.combinators import between
-import parsy
+from megaparsy.utils import try_
 
 from waterloo.types import (
     ArgsSection,
@@ -41,14 +42,14 @@ __all__ = ('docstring_parser', '_nested')
 scn = space(char.space1)
 
 # parser which only matches ' ' and '\t', but *not* newlines
-sc = parsy.regex(r'( |\t)*').result('')
+sc = parsy.regex(r'[ |\t]*').result('')
 
 _non_space = parsy.regex(r'\S')
 
 # factory for parser returning tokens separated by no-newline whitespace
 lexeme = partial(megaparsy_lexeme, p_space=sc)
 
-rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop at a newline
+rest_of_line = parsy.regex(r'.*')  # without DOTALL this will stop before a newline
 
 
 # SECTION HEADERS
@@ -117,16 +118,28 @@ type_atom = (
 
 # in "Args" section the type def is in parentheses after the var name
 arg_type_def = lexeme(
-    parsy.string('(') >> typed_mark(type_atom, TypeDef) << parsy.regex(r'\)\:?')
+    parsy.string('(') >> typed_mark(type_atom, TypeDef) << parsy.string(')')
+)
+
+optional_description = (
+    parsy.regex(r'[ |\t]*:')
+    |
+    parsy.regex(r'[ |\t]*') << (
+        parsy.regex(r'.+').should_fail("no description expected")
+    )
 )
 
 # NOTE: parsy.seq with kwargs needs Python 3.6+
-arg_type = parsy.seq(arg=var_name, type=arg_type_def.optional())
+arg_type = (
+    parsy.seq(arg=var_name, type=arg_type_def.optional())
+    << optional_description
+)
 
 # in "Returns" section the type def is bare and there is no var name
 # (description is not part of Napoleon spec but it's natural to provide one
 # so we allow to parse a colon separator followed by optional description)
-return_type = typed_mark(type_atom, TypeDef) << parsy.regex(r'\:?')
+# ...we also have to cope in some way if there is a description and no type
+return_type = typed_mark(type_atom, TypeDef) << optional_description
 
 
 # SECTION PARSERS
@@ -164,7 +177,7 @@ def indented_items(p_item: parsy.Parser) -> parsy.Parser:
     def _indented_items() -> IndentMany:
         head = yield p_item
         # in this case the `head` is the part of the item we care about
-        # and `tail` is be the folded arg description, we discard it
+        # and `tail` is the folded arg description, we discard it
         return IndentMany(indent=None, f=lambda _: head, p=p_line_fold)
 
     return _indented_items

@@ -215,7 +215,7 @@ def test_p_arg_list():
     example = """
         Kwargs:
             key (str): identifying a specific token bucket
-            num_tokens (int): will block without consuming any tokens until
+            num_tokens (int) : will block without consuming any tokens until
                 this amount are available to be consumed
             timeout (int): seconds to block for
             retry_interval (Optional[float]): how long to wait between polling
@@ -256,20 +256,75 @@ def test_p_arg_list():
     ])
 
 
-def test_p_returns_block():
+def test_p_arg_list_invalid():
     example = """
+        Kwargs:
+            just some blurb here, no args: nor here
+    """
+    with pytest.raises(parsy.ParseError):
+        p_arg_list.parse(example)
+
+
+@pytest.mark.parametrize('example,type_def', [
+    ("""
         Yield:
             Optional[float]: how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
-    """
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+            Optional[float] :  how about with whitespace around the colon?
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+            Optional[float]
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+            A
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('A', []),
+        (2, 13),
+     )),
+])
+def test_p_returns_block(example, type_def):
     section = p_returns_block.parse(example)
     assert section.name == ReturnsSection.YIELDS  # normalised -> "Returns" (Enum)
-    assert section.type_def == TypeDef.from_tuples(
-        (2, 12),
-        ('Optional', [TypeAtom('float', [])]),
-        (2, 27),
-    )
+    assert section.type_def == type_def
+
+
+@pytest.mark.parametrize('content', [
+    "",
+    "non-identifier",
+    "multiple words with no colon",
+    "non-identifier: followed by colon",
+    "some words: then a colon",
+])
+def test_p_returns_block_invalid(content):
+    example = f"""
+        Returns:
+            {content}
+    """
+    with pytest.raises(parsy.ParseError):
+        p_returns_block.parse(example)
 
 
 def test_docstring_parser():
@@ -409,6 +464,27 @@ def test_docstring_parser_no_annotations():
 
         bool: whether we got the requested tokens or not
             (False if timed out)
+
+        This is not Napoleon format.
+        """
+    expected = TypeSignature.factory(
+        arg_types=None,
+        return_type=None,
+    )
+
+    result = docstring_parser.parse(example)
+    assert result == expected
+
+
+def test_docstring_parser_invalid_blocks():
+    example = """
+        Will block thread until `num_tokens` could be consumed from token bucket `key`.
+
+        Args:
+            this is not an arg: "banana!"
+
+        Returns:
+            send it back within: 7 days
         """
     expected = TypeSignature.factory(
         arg_types=None,

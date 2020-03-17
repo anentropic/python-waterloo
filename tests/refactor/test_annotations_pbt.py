@@ -232,6 +232,8 @@ def identity(arg1):
             fw.write(content)
 
         test_settings = settings.copy(deep=True)
+        test_settings.ALLOW_UNTYPED_ARGS = False
+        test_settings.REQUIRE_RETURN_TYPE = False
         test_settings.IMPORT_COLLISION_POLICY = import_collision_policy
         test_settings.UNPATHED_TYPE_POLICY = unpathed_type_policy
 

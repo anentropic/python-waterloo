@@ -262,12 +262,12 @@ def _make_bare_import_node(name: str, trailing_nl: bool = False) -> Node:
 
 class AddTypeImports(NonMatchingFixer):
     """
-    TODO: update blurb
     Fixer that adds imports for all the `typing` and "dotted-path" types
     found in the document. We know that builtins don't need to be imported.
     We must then assume that all the remaining types are either defined in
-    the file or already imported (for now it's "too hard" to try and detect
-    if that is true... just run `mypy --py2` and get your errors).
+    the file or already imported. If unrecognised types are specified in the
+    docstring without a dotted path then how we treat the ambiguity is
+    configured via IMPORT_COLLISION_POLICY and UNPATHED_TYPE_POLICY settings.
     """
 
     def finish_tree(self, tree: Node, filename: str) -> None:

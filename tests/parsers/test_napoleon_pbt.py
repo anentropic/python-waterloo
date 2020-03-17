@@ -270,6 +270,7 @@ def _validate_returns_section(example, result, context):
 def test_p_returns_block(returns_section):
     example, context = returns_section
     result = p_returns_block.parse(example)
+    note(repr(result))
     _validate_returns_section(example, result, context)
 
 
