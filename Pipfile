@@ -17,7 +17,7 @@ toml = "*"
 regex = "*"
 pydantic = "*"
 typing-extensions = "*"
-bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post1"}
+bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
 parso = "*"
 inject = "*"
 

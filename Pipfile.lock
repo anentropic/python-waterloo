@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "6a6773147c68526d95a4daf3339b2b1f37743304ac513949cddb73497063dbd2"
+            "sha256": "a65693abfaae7c05166a2c075be7d623ee3b0cdb101f9cc89cfed22d07bd9a4b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -17,7 +17,7 @@
     },
     "default": {
         "bowler": {
-            "file": "https://github.com/anentropic/Bowler/tarball/0.8.0-post1"
+            "file": "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"
         },
         "inject": {
             "hashes": [

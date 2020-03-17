@@ -349,6 +349,7 @@ DOTTED_PATH_STRATEGIES: Final = {
     ImportStrategy.USE_EXISTING_DOTTED,
 }
 
+
 class AmbiguousTypeError(Exception):
     settings = inject.attr('settings')
 
@@ -392,6 +393,7 @@ class UnpathedTypePolicy(Enum):
 ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
 
 PRINTABLE_SETTINGS: Final = {
+    'PYTHON_VERSION',
     'ALLOW_UNTYPED_ARGS',
     'REQUIRE_RETURN_TYPE',
     'IMPORT_COLLISION_POLICY',

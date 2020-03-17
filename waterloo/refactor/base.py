@@ -36,6 +36,7 @@ class WaterlooQuery(Query):
 
     def __init__(self, *paths, **kwargs) -> None:
         super().__init__(*paths, **kwargs)
+        print(kwargs)
         self.raw_fixers = []
 
     def raw_fixer(self, fx: Type[BaseFix]) -> "WaterlooQuery":

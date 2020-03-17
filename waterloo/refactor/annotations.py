@@ -330,7 +330,7 @@ def annotate(*paths: str, settings, echo, **execute_kwargs):
     q = (
         WaterlooQuery(
             *paths,
-            python_version=str(settings.PYTHON_VERSION).split(".", 1)[0],
+            python_version=int(str(settings.PYTHON_VERSION).split(".", 1)[0]),
         )
         .select(r"""
             funcdef <
