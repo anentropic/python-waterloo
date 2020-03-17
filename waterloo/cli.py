@@ -1,12 +1,15 @@
 import argparse
 
+import inject
+
 from waterloo.__about__ import __version__
-from waterloo.conf import settings
+from waterloo import configuration_factory
 from waterloo.refactor import annotate
 from waterloo.types import ImportCollisionPolicy, UnpathedTypePolicy
 
 
-def main():
+@inject.params(settings='settings')
+def main(settings):
     parser = argparse.ArgumentParser(
         description=(
             f"Convert the type annotations in 'Google-style' docstrings (as"
@@ -121,6 +124,8 @@ def main():
     settings.REQUIRE_RETURN_TYPE = args.require_return_type
     settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
     settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
+
+    inject.clear_and_configure(configuration_factory(settings))
 
     annotate(
         *args.files,

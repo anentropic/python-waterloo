@@ -14,6 +14,8 @@ from typing import (
 )
 from typing_extensions import Final
 
+import inject
+
 
 class ArgsSection(str, Enum):
     ARGS = 'Args'
@@ -80,6 +82,13 @@ class TypeAtom(NamedTuple):
         return names
 
 
+def should_strip_path(name: str, strategy: Optional[ImportStrategy]) -> bool:
+    return (
+        name != Types.ELLIPSIS and
+        strategy not in DOTTED_PATH_STRATEGIES
+    )
+
+
 @singledispatch
 def _repr_type_arg(val, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     """
@@ -96,9 +105,8 @@ def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     """
     # `val` is the name from TypeAtom
     if (
-        val != Types.ELLIPSIS and
         name_to_strategy is not None
-        and name_to_strategy.get(val) is not ImportStrategy.ADD_DOTTED
+        and should_strip_path(val, name_to_strategy.get(val))
     ):
         val = val.rsplit('.', maxsplit=1)[-1]
     return val
@@ -278,7 +286,8 @@ class TypeSignature:
 class LocalTypes:
     class_defs: Set[str]
     star_imports: Set[str]
-    names_to_modules: Dict[str, str]
+    names_to_packages: Dict[str, str]
+    package_imports: Set[str]
 
     all_names: Set[str]
 
@@ -287,27 +296,29 @@ class LocalTypes:
         return cls(
             class_defs=set(),
             star_imports=set(),
-            names_to_modules={},
+            names_to_packages={},
             all_names=set(),
         )
 
     def update_all_names(self):
-        self.all_names.update(self.class_defs | self.names_to_modules.keys())
+        self.all_names.update(self.class_defs | self.names_to_packages.keys())
 
     @classmethod
     def factory(
         cls,
         class_defs: Set[str],
         star_imports: Set[str],
-        names_to_modules: Dict[str, str],
+        names_to_packages: Dict[str, str],
+        package_imports: Set[str],
     ) -> 'LocalTypes':
         # should be no overlap in names, that would be a bug in the src file!
-        assert not class_defs & names_to_modules.keys()
+        assert not class_defs & names_to_packages.keys()
         return cls(
             class_defs=class_defs,
             star_imports=star_imports,
-            names_to_modules=names_to_modules,
-            all_names=class_defs | names_to_modules.keys(),
+            names_to_packages=names_to_packages,
+            package_imports=package_imports,
+            all_names=class_defs | names_to_packages.keys(),
         )
 
     def __contains__(self, name) -> bool:
@@ -315,7 +326,7 @@ class LocalTypes:
 
     def __getitem__(self, name) -> Optional[str]:
         try:
-            return self.names_to_modules[name]
+            return self.names_to_packages[name]
         except KeyError:
             if name in self.class_defs:
                 return None
@@ -327,25 +338,43 @@ class LocalTypes:
 
 
 class ImportStrategy(Enum):
-    USE_EXISTING = auto()  # don't add any import
+    USE_EXISTING = auto()  # don't add any import, strip dotted path from docstring type
+    USE_EXISTING_DOTTED = auto()  # don't add any import
     ADD_FROM = auto()  # from <dotted.package.path> import <name list>
     ADD_DOTTED = auto()  # import <dotted.package.path>
 
 
+DOTTED_PATH_STRATEGIES: Final = {
+    ImportStrategy.ADD_DOTTED,
+    ImportStrategy.USE_EXISTING_DOTTED,
+}
+
 class AmbiguousTypeError(Exception):
-    pass
+    settings = inject.attr('settings')
+
+    @property
+    def should_fail(self):
+        return (
+            self.settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.FAIL
+        )
 
 
 class ModuleHasStarImportError(AmbiguousTypeError):
     pass
 
 
-class NotFoundNoPathError(AmbiguousTypeError):
-    pass
-
-
 class NameMatchesRelativeImportError(AmbiguousTypeError):
     pass
+
+
+class NameMatchesLocalClassError(AmbiguousTypeError):
+    pass
+
+
+class NotFoundNoPathError(AmbiguousTypeError):
+    @property
+    def should_fail(self):
+        return self.settings.UNPATHED_TYPE_POLICY is UnpathedTypePolicy.FAIL
 
 
 class ImportCollisionPolicy(Enum):

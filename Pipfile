@@ -19,6 +19,7 @@ pydantic = "*"
 typing-extensions = "*"
 bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post1"}
 parso = "*"
+inject = "*"
 
 [requires]
 python_version = ">=3.7"

@@ -1,30 +1,48 @@
-from typing import Set
+from enum import Enum
+from functools import singledispatch
 
+import inject
 import parsy
 from bowler import Capture
 
-from waterloo.conf import settings
 from waterloo.types import (
+    AmbiguousTypeError,
     ImportCollisionPolicy,
     ModuleHasStarImportError,
+    NameMatchesLocalClassError,
     NameMatchesRelativeImportError,
     NotFoundNoPathError,
+    PRINTABLE_SETTINGS,
     UnpathedTypePolicy,
 )
-from waterloo.utils import StylePrinter
 
 
-echo = StylePrinter(getattr(settings, 'ECHO_STYLES', None))
+@inject.params(settings='settings', echo='echo')
+def report_settings(settings, echo):
+    for key in sorted(PRINTABLE_SETTINGS):
+        try:
+            val = getattr(settings, key)
+        except AttributeError:
+            continue
+        if isinstance(val, Enum):
+            echo.debug(f"- {key}: <b>{val.name}</b>")
+        elif isinstance(val, str):
+            echo.debug(f"- {key}: <b>{val!r}</b>")
+        else:
+            echo.debug(f"- {key}: <b>{val}</b>")
+    echo.debug("")
 
 
-def report_parse_error(function: Capture, e: parsy.ParseError):
+@inject.params(echo='echo')
+def report_parse_error(e: parsy.ParseError, function: Capture, echo):
     echo.error(
         f"🛑 <b>line {function.lineno}:</b> Error parsing docstring for <b>def {function.value}</b>\n"
         f"   {e!r}"
     )
 
 
-def report_incomplete_arg_types(function: Capture):
+@inject.params(settings='settings', echo='echo')
+def report_incomplete_arg_types(function: Capture, settings, echo):
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types."
     if not settings.ALLOW_UNTYPED_ARGS:
         echo.error(
@@ -38,7 +56,8 @@ def report_incomplete_arg_types(function: Capture):
         )
 
 
-def report_incomplete_return_type(function: Capture):
+@inject.params(settings='settings', echo='echo')
+def report_incomplete_return_type(function: Capture, settings, echo):
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type."
     if settings.REQUIRE_RETURN_TYPE:
         echo.error(
@@ -52,10 +71,23 @@ def report_incomplete_return_type(function: Capture):
         )
 
 
-def report_module_has_star_import(
+@singledispatch
+def report_ambiguous_type_error(
+    e: AmbiguousTypeError,
     function: Capture,
+):
+    raise TypeError(
+        f"Unexpected AmbiguousTypeError: {e!r}"
+    )
+
+
+@report_ambiguous_type_error.register
+@inject.params(settings='settings', echo='echo')
+def _(
     e: ModuleHasStarImportError,
-    fail_policies: Set[ImportCollisionPolicy],
+    function: Capture,
+    settings,
+    echo,
 ):
     t_module, t_name = e.args
     assert t_module
@@ -69,7 +101,7 @@ def report_module_has_star_import(
             f"   ➤ annotation added: will assume existing import is sufficient\n"
             f"   ➤ if you would like a specific import to be added, undo this change and re-run with ImportCollisionPolicy.IMPORT"
         )
-    elif settings.IMPORT_COLLISION_POLICY in fail_policies:
+    elif e.should_fail:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"
@@ -82,10 +114,46 @@ def report_module_has_star_import(
         )
 
 
-def report_name_matches_relative_import(
+@report_ambiguous_type_error.register
+@inject.params(settings='settings', echo='echo')
+def _(
+    e: NameMatchesLocalClassError,
     function: Capture,
+    settings,
+    echo,
+):
+    t_module, t_name = e.args
+    type_path = f"{t_module}.{t_name}" if t_module else t_name
+    msg = (
+        f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{type_path}</b> in docstring for <b>def {function.value}</b> "
+        f"matches a \"class {t_name}\" also defined in the module, but we don't know if it is the same."
+    )
+    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.NO_IMPORT:
+        echo.warning(
+            f"⚠️  {msg}\n"
+            f"   ➤ annotation added: will assume was intended to match local class def\n"
+            f"   ➤ if you would like a specific import to be added, undo this change and re-run with ImportCollisionPolicy.IMPORT"
+        )
+    elif e.should_fail:
+        echo.error(
+            f"🛑 {msg}\n"
+            f"   ➤ no type annotation added\n"
+            f"   ➤ if you would like an import and annotation to be added, re-run with ImportCollisionPolicy.IMPORT"
+        )
+    else:
+        raise ValueError(
+            f"Unexpected fall-thru for {e.__class__.__name__} and "
+            f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
+        )
+
+
+@report_ambiguous_type_error.register
+@inject.params(settings='settings', echo='echo')
+def _(
     e: NameMatchesRelativeImportError,
-    fail_policies: Set[ImportCollisionPolicy],
+    function: Capture,
+    settings,
+    echo,
 ):
     t_module, t_name = e.args
     type_path = f"{t_module}.{t_name}" if t_module else t_name
@@ -99,7 +167,7 @@ def report_name_matches_relative_import(
             f"   ➤ annotation added: will assume existing import is sufficient\n"
             f"   ➤ if you would like a specific import to be added, undo this change and re-run with ImportCollisionPolicy.IMPORT"
         )
-    elif settings.IMPORT_COLLISION_POLICY in fail_policies:
+    elif e.should_fail:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"
@@ -112,10 +180,13 @@ def report_name_matches_relative_import(
         )
 
 
-def report_not_found_no_path(
-    function: Capture,
+@report_ambiguous_type_error.register
+@inject.params(settings='settings', echo='echo')
+def _(
     e: NotFoundNoPathError,
-    fail_policies: Set[UnpathedTypePolicy],
+    function: Capture,
+    settings,
+    echo,
 ):
     _, t_name = e.args
     msg = (
@@ -124,12 +195,12 @@ def report_not_found_no_path(
         f"a dotted-path we can use to add an import statement. However there are some forms we cannot auto-detect "
         f"which may mean no import is needed."
     )
-    if settings.UNPATHED_TYPE_POLICY is UnpathedTypePolicy.WARN:
+    if settings.UNPATHED_TYPE_POLICY in {UnpathedTypePolicy.WARN, UnpathedTypePolicy.IGNORE}:
         echo.warning(
             f"⚠️  {msg}\n"
             f"   ➤ annotation added: will assume no import needed"
         )
-    elif settings.UNPATHED_TYPE_POLICY in fail_policies:
+    elif e.should_fail:
         echo.error(
             f"🛑 {msg}\n"
             f"   ➤ no type annotation added\n"

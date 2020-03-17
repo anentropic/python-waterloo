@@ -3,14 +3,15 @@ from enum import Enum, auto
 from itertools import chain
 from typing import cast, Callable, Dict, Generator, List, Optional, Set, Tuple
 
+import inject
 import parso
 
-from waterloo.conf import settings
 from waterloo.types import (
     ImportCollisionPolicy,
     ImportStrategy,
     LocalTypes,
     ModuleHasStarImportError,
+    NameMatchesLocalClassError,
     NameMatchesRelativeImportError,
     NameToStrategy_T,
     NotFoundNoPathError,
@@ -95,46 +96,49 @@ def walk_tree(
         yield node
 
 
-def find_local_types(filename: str) -> LocalTypes:
+@inject.params(settings='settings')
+def find_local_types(filename: str, settings) -> LocalTypes:
     """
     TODO: parso understands scopes so we could feasibly
     determine visibility of non-top-level classdefs and imports
     (currently we find defs at all levels)
+    TODO: if we don't do scopes maybe we should take top-level defs only
     """
     grammar = parso.load_grammar(version=settings.PYTHON_VERSION)
     with open(filename) as f:
         tree = grammar.parse(f.read(), path=filename)
     class_defs = set()
     star_imports = set()
-    names_to_modules = {}
+    names_to_packages = {}
+    package_imports = set()
     for node in walk_tree(tree):
         if isinstance(node, parso.python.tree.Class):
             class_defs.add(node.name.value)
         elif isinstance(node, parso.python.tree.ImportFrom):
             prefix = "." * node.level
-            module = ".".join(name.value for name in node.get_from_names())
+            package = ".".join(name.value for name in node.get_from_names())
             if node.is_star_import():
-                star_imports.add(f"{prefix}{module}")
+                star_imports.add(f"{prefix}{package}")
             else:
                 for name in node.get_defined_names():
-                    names_to_modules[name.value] = f"{prefix}{module}"
+                    names_to_packages[name.value] = f"{prefix}{package}"
         elif isinstance(node, parso.python.tree.ImportName):
             paths = node.get_paths()[0]
-            name = paths[-1].value
-            if len(paths) > 1:
-                module = ".".join(path.value for path in paths[:-1])
-            else:
-                module = None
-            names_to_modules[name] = module
+            package_imports.add(
+                ".".join(path.value for path in paths)
+            )
     return LocalTypes.factory(
         class_defs=class_defs,
         star_imports=star_imports,
-        names_to_modules=names_to_modules,
+        names_to_packages=names_to_packages,
+        package_imports=package_imports,
     )
 
 
+@inject.params(settings='settings')
 def strategy_for_name_factory(
-    local_types: LocalTypes
+    local_types: LocalTypes,
+    settings,
 ) -> Callable[[str], ImportStrategy]:
     """
     Args:
@@ -169,12 +173,24 @@ def strategy_for_name_factory(
             module, name = name.rsplit(".", maxsplit=1)
             if name in local_types:
                 local_module = local_types[name]
-                if local_module is None or module == local_module:
-                    # `local_module is None` means local ClassDef
+                if module == local_module:
                     # `module == local_module` means an exact match in imports
+                    # i.e. from <apckage match> import <name match>
                     return ImportStrategy.USE_EXISTING
+                elif local_module is None:
+                    # `local_module is None` means local ClassDef
+                    # if there is a local ClassDef and type has dotted path then
+                    # maybe it was intended to disambiguate from the local cls?
+                    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
+                        # the name was maybe already in scope but it's safe
+                        # to add a specific import as well
+                        return ImportStrategy.ADD_DOTTED
+                    else:
+                        # TODO in theory we could probably calculate the absolute
+                        # import from filename + relative path, but it's awkward
+                        raise NameMatchesLocalClassError(module, name)
                 elif local_module.startswith("."):
-                    # "can't tell"
+                    # Relative import: "can't tell"
                     # we have a full path so we could add an import
                     # but it may be duplicating something already imported
                     if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
@@ -182,7 +198,7 @@ def strategy_for_name_factory(
                         # to add a specific import as well
                         return ImportStrategy.ADD_DOTTED
                     else:
-                        # TODO in theory we could probably calculate the abs
+                        # TODO in theory we could probably calculate the absolute
                         # import from filename + relative path, but it's awkward
                         raise NameMatchesRelativeImportError(module, name)
                 else:
@@ -202,14 +218,19 @@ def strategy_for_name_factory(
                     else:
                         raise ModuleHasStarImportError(module, name)
                 else:
-                    return ImportStrategy.ADD_FROM
+                    if module in local_types.package_imports:
+                        return ImportStrategy.USE_EXISTING_DOTTED
+                    else:
+                        return ImportStrategy.ADD_FROM
         else:
-            if name in local_types:
+            if name == Types.ELLIPSIS:
+                return ImportStrategy.USE_EXISTING
+            elif name in local_types:
                 return ImportStrategy.USE_EXISTING
             elif _is_builtin_type(name):
                 return ImportStrategy.USE_EXISTING
             elif _is_typing_type(name):
-                return ImportStrategy.USE_EXISTING
+                return ImportStrategy.ADD_FROM
             else:
                 # there's no possibility to add an import, so no AUTO option
                 raise NotFoundNoPathError(None, name)
@@ -226,23 +247,19 @@ def get_import_lines(
     checking to work.
 
     Furthermore it is assumed we will run `isort` on the resulting file, and
-    perhaps `black`/`flake8`, to save us the hassle of trying to nicely format
-    the inserted imports, or deduplicate them etc.
+    perhaps `black`/`flake8`, to save us the hassle of trying too hard to
+    nicely format the inserted imports, or deduplicate them etc.
     """
-    import_tuples: Tuple[Optional[str], str] = []
+    import_tuples: List[Tuple[Optional[str], str]] = []
 
-    typing_types = {
-        name
-        for name in strategies.get(ImportStrategy.USE_EXISTING, set())
-        if _is_typing_type(name)
-    }
-    import_tuples.extend(
-        ("typing", name)
-        for name in typing_types
-    )
+    def from_import(name: str) -> Tuple[str, str]:
+        if _is_typing_type(name):
+            return ("typing", name)
+        else:
+            return cast(Tuple[str, str], tuple(name.rsplit('.', maxsplit=1)))
 
     import_tuples.extend(
-        cast(Tuple[str, str], tuple(name.rsplit('.', maxsplit=1)))
+        from_import(name)
         for name in strategies.get(ImportStrategy.ADD_FROM, set())
     )
 

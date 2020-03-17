@@ -1,7 +1,7 @@
-from enum import Enum
 from threading import local
-from typing import Sequence
+from typing import Dict, Sequence
 
+import inject
 import parsy
 from bowler import Capture, Filename, LN
 from fissix.fixer_util import Newline
@@ -9,7 +9,6 @@ from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
-from waterloo.conf import settings
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.refactor.base import (
     interrupt_modifier,
@@ -18,13 +17,11 @@ from waterloo.refactor.base import (
 )
 from waterloo.refactor.exceptions import Interrupt
 from waterloo.refactor.printer import (
-    echo,
-    report_parse_error,
     report_incomplete_arg_types,
     report_incomplete_return_type,
-    report_module_has_star_import,
-    report_name_matches_relative_import,
-    report_not_found_no_path,
+    report_ambiguous_type_error,
+    report_parse_error,
+    report_settings,
 )
 from waterloo.refactor.utils import (
     find_local_types,
@@ -35,13 +32,7 @@ from waterloo.refactor.utils import (
 )
 from waterloo.types import (
     AmbiguousTypeError,
-    ImportCollisionPolicy,
     ImportStrategy,
-    ModuleHasStarImportError,
-    NameMatchesRelativeImportError,
-    NotFoundNoPathError,
-    PRINTABLE_SETTINGS,
-    UnpathedTypePolicy,
 )
 
 
@@ -50,8 +41,11 @@ from waterloo.types import (
 threadlocals = local()
 
 
-def _init_threadlocals(filename):
+@inject.params(settings='settings')
+def _init_threadlocals(filename, settings):
     global threadlocals
+
+    threadlocals.settings = settings
 
     local_types = find_local_types(filename)
     threadlocals.strategy_for_name = strategy_for_name_factory(local_types)
@@ -71,27 +65,30 @@ def _cleanup_threadlocals():
             pass
 
 
-def record_type_name(name: str) -> ImportStrategy:
-    strategy = threadlocals.strategy_for_name(name)
-    threadlocals.strategy_to_names.setdefault(strategy, set()).add(name)
-    return strategy
+def record_type_names(name_to_strategy: Dict[str, ImportStrategy]):
+    for name, strategy in name_to_strategy.items():
+        threadlocals.strategy_to_names.setdefault(strategy, set()).add(name)
 
 
 class StartFile(NonMatchingFixer):
+    echo = inject.attr('echo')
+
     def start_tree(self, tree: Node, filename: str) -> None:
-        echo.info(f"<b>{filename}</b>")
+        self.echo.info(f"<b>{filename}</b>")
         _init_threadlocals(filename)
 
 
 class EndFile(NonMatchingFixer):
+    echo = inject.attr('echo')
+
     def finish_tree(self, tree: Node, filename: str) -> None:
         if threadlocals.comment_count:
-            echo.info(
+            self.echo.info(
                 f"➤➤ <b>{threadlocals.comment_count}</b> type comments added in file 🎉"
             )
         else:
-            echo.info("➤➤ (no docstrings with annotatable types found in file)")
-        echo.info("")
+            self.echo.info("➤➤ (no docstrings with annotatable types found in file)")
+        self.echo.info("")
         _cleanup_threadlocals()
 
 
@@ -131,7 +128,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     try:
         signature = docstring_parser.parse(capture['docstring_node'].value)
     except parsy.ParseError as e:
-        report_parse_error(function, e)
+        report_parse_error(e, function)
         raise Interrupt
 
     if not signature.has_types:
@@ -142,12 +139,12 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # configurably, like for amibiguous types
     if not signature.arg_types.is_fully_typed:
         report_incomplete_arg_types(function)
-        if not settings.ALLOW_UNTYPED_ARGS:
+        if not threadlocals.settings.ALLOW_UNTYPED_ARGS:
             raise Interrupt
 
     if not signature.return_type or not signature.return_type.is_fully_typed:
         report_incomplete_return_type(function)
-        if settings.REQUIRE_RETURN_TYPE:
+        if threadlocals.settings.REQUIRE_RETURN_TYPE:
             raise Interrupt
 
     # yes, annotate...
@@ -155,30 +152,16 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
 
     # record types found in this docstring
     # and warn/fail on ambiguous types according to IMPORT_COLLISION_POLICY
-    name_to_strategy = {}
+    name_to_strategy: Dict[str, ImportStrategy] = {}
     for name in signature.type_names():
         try:
-            name_to_strategy[name] = record_type_name(name)
+            name_to_strategy[name] = threadlocals.strategy_for_name(name)
         except AmbiguousTypeError as e:
-            if isinstance(e, ModuleHasStarImportError):
-                fail_policies = {ImportCollisionPolicy.FAIL}
-                report_module_has_star_import(function, e, fail_policies)
-                if settings.IMPORT_COLLISION_POLICY in fail_policies:
-                    raise Interrupt
-            elif isinstance(e, NameMatchesRelativeImportError):
-                fail_policies = {ImportCollisionPolicy.FAIL}
-                report_name_matches_relative_import(function, e, fail_policies)
-                if settings.IMPORT_COLLISION_POLICY in fail_policies:
-                    raise Interrupt
-            elif isinstance(e, NotFoundNoPathError):
-                fail_policies = {UnpathedTypePolicy.FAIL}
-                report_not_found_no_path(function, e, fail_policies)
-                if settings.UNPATHED_TYPE_POLICY in fail_policies:
-                    raise Interrupt
-            else:
-                raise ValueError(
-                    f"Unexpected AmbiguousTypeError: {e!r}"
-                )
+            report_ambiguous_type_error(e, function)
+            if e.should_fail:
+                raise Interrupt
+
+    record_type_names(name_to_strategy)
 
     # add the type comment as first line of func body (before docstring)
     type_comment = get_type_comment(signature, name_to_strategy)
@@ -200,7 +183,7 @@ def _find_import_pos(root: Node) -> int:
     """
     This logic cribbed from `fissix.fix_utils.touch_import`
     ...but we want to be able to output a single import line with multiple
-    names imported from one module, so we'll use our own `_make_import_node`
+    names imported from one package, so we'll use our own `_make_import_node`
     """
 
     def _is_import(node: Node) -> bool:
@@ -241,7 +224,9 @@ def _find_import_pos(root: Node) -> int:
     return insert_pos
 
 
-def _make_from_import_node(left: str, right: Sequence[str]) -> Node:
+def _make_from_import_node(
+    left: str, right: Sequence[str], trailing_nl: bool = False
+) -> Node:
     assert right  # non-empty
     name_leaves = [Leaf(token.NAME, right[0], prefix=" ")]
     name_leaves.extend(
@@ -255,19 +240,24 @@ def _make_from_import_node(left: str, right: Sequence[str]) -> Node:
         Node(syms.import_as_names, name_leaves),
         Newline(),
     ]
+    if trailing_nl:
+        children.append(Newline())
     return Node(syms.import_from, children)
 
 
-def _make_bare_import_node(name: str) -> Node:
+def _make_bare_import_node(name: str, trailing_nl: bool = False) -> Node:
     assert name  # non-empty
+    children = [
+        Leaf(token.NAME, "import"),
+        Leaf(token.NAME, name, prefix=" "),
+        Newline(),
+    ]
+    if trailing_nl:
+        children.append(Newline())
     return Node(
-            syms.import_name,
-            [
-                Leaf(token.NAME, "import"),
-                Leaf(token.NAME, name, prefix=" "),
-                Newline(),
-            ],
-        )
+        syms.import_name,
+        children,
+    )
 
 
 class AddTypeImports(NonMatchingFixer):
@@ -294,19 +284,27 @@ class AddTypeImports(NonMatchingFixer):
         sorted_tuples = sorted(
             imports_dict.items(),
             key=_sort_key,
-            reverse=True,
+            reverse=True,  # because we insert last nodes first
         )
-        for left, right in sorted_tuples:
+        for i, (left, right) in enumerate(sorted_tuples):
             if left:
-                import_node = _make_from_import_node(left, sorted(right))
+                import_node = _make_from_import_node(
+                    left=left,
+                    right=sorted(right),
+                    trailing_nl=i == 0 and insert_pos == 0,
+                )
                 tree.insert_child(insert_pos, import_node)
             else:
-                for name in right:
-                    import_node = _make_bare_import_node(name)
+                for j, name in enumerate(right):
+                    import_node = _make_bare_import_node(
+                        name=name,
+                        trailing_nl=i == 0 and j == 0 and insert_pos == 0,
+                    )
                     tree.insert_child(insert_pos, import_node)
 
 
-def annotate(*paths: str, **execute_kwargs):
+@inject.params(settings='settings', echo='echo')
+def annotate(*paths: str, settings, echo, **execute_kwargs):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
@@ -327,18 +325,7 @@ def annotate(*paths: str, **execute_kwargs):
         **execute_kwargs: passed into the bowler `Query.execute()` method
     """
     echo.debug("Running with options:")
-    for key in sorted(PRINTABLE_SETTINGS):
-        try:
-            val = getattr(settings, key)
-        except AttributeError:
-            continue
-        if isinstance(val, Enum):
-            echo.debug(f"- {key}: <b>{val.name}</b>")
-        elif isinstance(val, str):
-            echo.debug(f"- {key}: <b>{val!r}</b>")
-        else:
-            echo.debug(f"- {key}: <b>{val}</b>")
-    echo.debug("")
+    report_settings()
 
     q = (
         WaterlooQuery(
