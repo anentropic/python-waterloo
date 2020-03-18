@@ -5,6 +5,7 @@ import pytest
 from waterloo.types import (
     ArgsSection,
     ArgTypes,
+    ImportStrategy,
     ReturnsSection,
     ReturnType,
     TypeAtom,
@@ -44,44 +45,51 @@ from waterloo.types import (
         ])
      ])),
 ])
-def test_type_atom_to_annotation(expected, example):
-    assert example.to_annotation(False) == expected
+def test_type_atom_to_annotation_no_strategies(expected, example):
+    assert example.to_annotation(None) == expected
 
 
-@pytest.mark.parametrize('expected,example', [
-    ("str", TypeAtom("str", [])),
-    ("Dict", TypeAtom("Dict", [])),
-    ("Dict[int, str]",
-     TypeAtom("Dict", [
-        TypeAtom("int", []),
-        TypeAtom("str", [])
-     ])),
+@pytest.mark.parametrize('expected,example,name_to_strategy', [
+    ("str", TypeAtom("str", []), {}),
+    ("Dict", TypeAtom("Dict", []), {}),
     ("Dict[int, User]",
      TypeAtom("Dict", [
         TypeAtom("int", []),
         TypeAtom("db.models.User", [])
-     ])),
+     ]),
+     {"db.models.User": ImportStrategy.ADD_FROM}),
+    ("Dict[int, db.models.User]",
+     TypeAtom("Dict", [
+        TypeAtom("int", []),
+        TypeAtom("db.models.User", [])
+     ]),
+     {"db.models.User": ImportStrategy.ADD_DOTTED}),
+    ("Dict[int, User]",
+     TypeAtom("Dict", [
+        TypeAtom("int", []),
+        TypeAtom("db.models.User", [])
+     ]),
+     {}),
     ("Container[int]",
      TypeAtom("my.generic.Container", [
         TypeAtom("int", [])
-     ])),
-    ("Tuple[int, ...]",
-     TypeAtom("Tuple", [
-        TypeAtom("int", []),
-        TypeAtom("...", [])
-     ])),
-    ("Callable[[int, str], Dict[int, str]]",
-     TypeAtom("Callable", [
-        [TypeAtom("int", []),
-         TypeAtom("str", [])],
-        TypeAtom("Dict", [
-            TypeAtom("int", []),
-            TypeAtom("str", [])
-        ])
-     ])),
+     ]),
+     {"my.generic.Container": ImportStrategy.ADD_FROM}),
+    ("my.generic.Container[int]",
+     TypeAtom("my.generic.Container", [
+        TypeAtom("int", [])
+     ]),
+     {"my.generic.Container": ImportStrategy.ADD_DOTTED}),
+    ("Container[int]",
+     TypeAtom("my.generic.Container", [
+        TypeAtom("int", [])
+     ]),
+     {}),
 ])
-def test_type_atom_to_annotation_fix_dotted_paths(expected, example):
-    assert example.to_annotation(True) == expected
+def test_type_atom_to_annotation_dotted_path_strategies(
+    expected, example, name_to_strategy
+):
+    assert example.to_annotation(name_to_strategy) == expected
 
 
 @pytest.mark.parametrize('expected,example', [

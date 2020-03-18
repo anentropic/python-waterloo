@@ -215,8 +215,7 @@ def test_p_arg_list():
     example = """
         Kwargs:
             key (str): identifying a specific token bucket
-            num_tokens (int): will block without consuming any tokens until
-                this amount are available to be consumed
+            num_tokens (int) : whitespace around the colon
             timeout (int): seconds to block for
             retry_interval (Optional[float]): how long to wait between polling
                 for tokens to be available. `None` means use default interval
@@ -241,35 +240,102 @@ def test_p_arg_list():
          )),
         ('timeout',
          TypeDef.from_tuples(
-            (5, 21),
+            (4, 21),
             ('int', []),
-            (5, 24),
+            (4, 24),
          )),
         ('retry_interval',
          TypeDef.from_tuples(
-            (6, 28),
+            (5, 28),
             ('Optional', [TypeAtom('float', [])]),
-            (6, 43),
+            (5, 43),
          )),
         ('*inner_args', None),
         ('**inner_kwargs', None),
     ])
 
 
-def test_p_returns_block():
+def test_p_arg_list_invalid():
     example = """
+        Kwargs:
+            just some blurb here, no args: nor here
+    """
+    with pytest.raises(parsy.ParseError):
+        p_arg_list.parse(example)
+
+
+@pytest.mark.parametrize('example,type_def', [
+    ("""
         Yield:
             Optional[float]: how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
-    """
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+
+            Optional[float]: how long to wait between polling
+                for tokens to be available. `None` means use default interval
+                which is equal to time needed to replenish `num_tokens`.
+    """,
+     TypeDef.from_tuples(
+        (3, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (3, 27),
+     )),
+    ("""
+        Yield:
+            Optional[float] :  how about with whitespace around the colon?
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+            Optional[float]
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('Optional', [TypeAtom('float', [])]),
+        (2, 27),
+     )),
+    ("""
+        Yield:
+            A
+    """,
+     TypeDef.from_tuples(
+        (2, 12),
+        TypeAtom('A', []),
+        (2, 13),
+     )),
+])
+def test_p_returns_block(example, type_def):
     section = p_returns_block.parse(example)
     assert section.name == ReturnsSection.YIELDS  # normalised -> "Returns" (Enum)
-    assert section.type_def == TypeDef.from_tuples(
-        (2, 12),
-        ('Optional', [TypeAtom('float', [])]),
-        (2, 27),
-    )
+    assert section.type_def == type_def
+
+
+@pytest.mark.parametrize('content', [
+    "",
+    "non-identifier",
+    "multiple words with no colon",
+    "non-identifier: followed by colon",
+    "some words: then a colon",
+])
+def test_p_returns_block_invalid(content):
+    example = f"""
+        Returns:
+            {content}
+    """
+    with pytest.raises(parsy.ParseError):
+        p_returns_block.parse(example)
 
 
 def test_docstring_parser():
@@ -338,6 +404,7 @@ def test_docstring_parser2():
         Will block thread until `num_tokens` could be consumed from token bucket `key`.
 
         Args:
+
             key (str): identifying a specific token bucket
             num_tokens (int): will block without consuming any tokens until
                 this amount are availabe to be consumed
@@ -347,6 +414,7 @@ def test_docstring_parser2():
                 which is equal to time needed to replenish `num_tokens`.
 
         Returns:
+
             Tuple[
                 int,
                 str,
@@ -359,40 +427,40 @@ def test_docstring_parser2():
             args=OrderedDict([
                 ('key',
                  TypeDef.from_tuples(
-                    (4, 17),
+                    (5, 17),
                     ('str', []),
-                    (4, 20),
+                    (5, 20),
                  )),
                 ('num_tokens',
                  TypeDef.from_tuples(
-                    (5, 24),
+                    (6, 24),
                     ('int', []),
-                    (5, 27),
+                    (6, 27),
                  )),
                 ('timeout',
                  TypeDef.from_tuples(
-                    (7, 21),
+                    (8, 21),
                     ('int', []),
-                    (7, 24),
+                    (8, 24),
                  )),
                 ('retry_interval',
                  TypeDef.from_tuples(
-                    (8, 28),
+                    (9, 28),
                     ('Optional', [TypeAtom('float', [])]),
-                    (8, 43),
+                    (9, 43),
                  )),
             ]),
         ),
         return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeDef.from_tuples(
-                (13, 12),
+                (15, 12),
                 ("Tuple", [
                     TypeAtom("int", []),
                     TypeAtom("str", []),
                     TypeAtom("ClassName", [])
                 ]),
-                (17, 13),
+                (19, 13),
             ),
         )
     )
@@ -409,6 +477,27 @@ def test_docstring_parser_no_annotations():
 
         bool: whether we got the requested tokens or not
             (False if timed out)
+
+        This is not Napoleon format.
+        """
+    expected = TypeSignature.factory(
+        arg_types=None,
+        return_type=None,
+    )
+
+    result = docstring_parser.parse(example)
+    assert result == expected
+
+
+def test_docstring_parser_invalid_blocks():
+    example = """
+        Will block thread until `num_tokens` could be consumed from token bucket `key`.
+
+        Args:
+            this is not an arg: "banana!"
+
+        Returns:
+            send it back within: 7 days
         """
     expected = TypeSignature.factory(
         arg_types=None,

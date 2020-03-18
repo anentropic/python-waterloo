@@ -1,17 +1,20 @@
 from __future__ import annotations
 from collections import OrderedDict
+from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
+from functools import singledispatch
 from typing import (
-    cast,
     Dict,
     Iterable,
     NamedTuple,
     Optional,
     Set,
     Tuple,
-    Union,
 )
+from typing_extensions import Final
+
+import inject
 
 
 class ArgsSection(str, Enum):
@@ -29,7 +32,7 @@ class Types(str, Enum):
 
 
 # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections
-VALID_ARGS_SECTION_NAMES = {
+VALID_ARGS_SECTION_NAMES: Final = {
     'Args',
     'Kwargs',  # not an official part of Napoleon spec but frequently used
     'Arguments',
@@ -38,41 +41,26 @@ VALID_ARGS_SECTION_NAMES = {
     'Parameters',
 }
 
-VALID_RETURNS_SECTION_NAMES = {
+VALID_RETURNS_SECTION_NAMES: Final = {
     'Return': (r'Return(?!s)', ReturnsSection.RETURNS),
     'Returns': (r'Returns', ReturnsSection.RETURNS),
     'Yield': (r'Yield(?!s)', ReturnsSection.YIELDS),
     'Yields': (r'Yields', ReturnsSection.YIELDS),
 }
 
-
-def _repr_type_arg(
-    arg: Union[str, 'TypeAtom', Iterable['TypeAtom']], fix_dotted_paths=True
-) -> str:
-    if isinstance(arg, str) or not arg:
-        val = cast(str, arg) or ''
-        if fix_dotted_paths and val != Types.ELLIPSIS:
-            val = val.split('.')[-1]
-        return val
-    elif isinstance(arg, TypeAtom):
-        return arg.to_annotation(fix_dotted_paths)
-    elif isinstance(arg, Iterable):
-        sub_args = ", ".join(
-            _repr_type_arg(sub, fix_dotted_paths) for sub in arg
-        )
-        return f"[{sub_args}]"
-    else:
-        raise TypeError(arg)
+NameToStrategy_T = Dict[str, 'ImportStrategy']
 
 
 class TypeAtom(NamedTuple):
     name: str
     args: Iterable['TypeAtom']
 
-    def to_annotation(self, fix_dotted_paths=True) -> str:
-        name = _repr_type_arg(self.name, fix_dotted_paths)
+    def to_annotation(
+        self, name_to_strategy: Optional[NameToStrategy_T]
+    ) -> str:
+        name = _repr_type_arg(self.name, name_to_strategy)
         if self.args:
-            args_annotations = _repr_type_arg(self.args, fix_dotted_paths)
+            args_annotations = _repr_type_arg(self.args, name_to_strategy)
             return f"{name}{args_annotations}"
         else:
             return name
@@ -92,6 +80,54 @@ class TypeAtom(NamedTuple):
                 for atom in arg:
                     names |= atom.type_names()
         return names
+
+
+def should_strip_path(name: str, strategy: Optional[ImportStrategy]) -> bool:
+    return (
+        name != Types.ELLIPSIS and
+        strategy not in DOTTED_PATH_STRATEGIES
+    )
+
+
+@singledispatch
+def _repr_type_arg(val, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    """
+    Helper for representing a TypeAtom as a type annotation
+    """
+    raise TypeError(val)
+
+
+@_repr_type_arg.register
+def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    """
+    By default we will strip dotted package prefix from type name,
+    unless we find ImportStrategy.ADD_DOTTED
+    """
+    # `val` is the name from TypeAtom
+    if (
+        name_to_strategy is not None
+        and should_strip_path(val, name_to_strategy.get(val))
+    ):
+        val = val.rsplit('.', maxsplit=1)[-1]
+    return val
+
+
+@_repr_type_arg.register
+def _(arg: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    return arg.to_annotation(name_to_strategy)
+
+
+@_repr_type_arg.register(IterableABC)
+def _(
+    val: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]
+) -> str:
+    if not val:
+        return ""
+    # recurse
+    sub_args = ", ".join(
+        _repr_type_arg(sub, name_to_strategy) for sub in val
+    )
+    return f"[{sub_args}]"
 
 
 class SourcePos(NamedTuple):
@@ -137,8 +173,10 @@ class TypeDef(NamedTuple):
     def args(self) -> Iterable[TypeAtom]:
         return self.type_atom.args
 
-    def to_annotation(self, fix_dotted_paths=True) -> str:
-        return self.type_atom.to_annotation(fix_dotted_paths)
+    def to_annotation(
+        self, name_to_strategy: Optional[NameToStrategy_T]
+    ) -> str:
+        return self.type_atom.to_annotation(name_to_strategy)
 
     def type_names(self) -> Set[str]:
         return self.type_atom.type_names()
@@ -244,6 +282,120 @@ class TypeSignature:
         return names
 
 
-class ImportsForTypes(NamedTuple):
-    imports: Dict[str, Set[str]]
-    unimported: Set[str]
+@dataclass(frozen=True)
+class LocalTypes:
+    class_defs: Set[str]
+    star_imports: Set[str]
+    names_to_packages: Dict[str, str]
+    package_imports: Set[str]
+
+    all_names: Set[str]
+
+    @classmethod
+    def empty(cls) -> 'LocalTypes':
+        return cls(
+            class_defs=set(),
+            star_imports=set(),
+            names_to_packages={},
+            all_names=set(),
+        )
+
+    def update_all_names(self):
+        self.all_names.update(self.class_defs | self.names_to_packages.keys())
+
+    @classmethod
+    def factory(
+        cls,
+        class_defs: Set[str],
+        star_imports: Set[str],
+        names_to_packages: Dict[str, str],
+        package_imports: Set[str],
+    ) -> 'LocalTypes':
+        # should be no overlap in names, that would be a bug in the src file!
+        assert not class_defs & names_to_packages.keys()
+        return cls(
+            class_defs=class_defs,
+            star_imports=star_imports,
+            names_to_packages=names_to_packages,
+            package_imports=package_imports,
+            all_names=class_defs | names_to_packages.keys(),
+        )
+
+    def __contains__(self, name) -> bool:
+        return name in self.all_names
+
+    def __getitem__(self, name) -> Optional[str]:
+        try:
+            return self.names_to_packages[name]
+        except KeyError:
+            if name in self.class_defs:
+                return None
+            else:
+                raise KeyError(name)
+
+    def __len__(self):
+        return len(self.all_names)
+
+
+class ImportStrategy(Enum):
+    USE_EXISTING = auto()  # don't add any import, strip dotted path from docstring type
+    USE_EXISTING_DOTTED = auto()  # don't add any import
+    ADD_FROM = auto()  # from <dotted.package.path> import <name list>
+    ADD_DOTTED = auto()  # import <dotted.package.path>
+
+
+DOTTED_PATH_STRATEGIES: Final = {
+    ImportStrategy.ADD_DOTTED,
+    ImportStrategy.USE_EXISTING_DOTTED,
+}
+
+
+class AmbiguousTypeError(Exception):
+    settings = inject.attr('settings')
+
+    @property
+    def should_fail(self):
+        return (
+            self.settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.FAIL
+        )
+
+
+class ModuleHasStarImportError(AmbiguousTypeError):
+    pass
+
+
+class NameMatchesRelativeImportError(AmbiguousTypeError):
+    pass
+
+
+class NameMatchesLocalClassError(AmbiguousTypeError):
+    pass
+
+
+class NotFoundNoPathError(AmbiguousTypeError):
+    @property
+    def should_fail(self):
+        return self.settings.UNPATHED_TYPE_POLICY is UnpathedTypePolicy.FAIL
+
+
+class ImportCollisionPolicy(Enum):
+    IMPORT = auto()  # annotate and add an import, no warning
+    NO_IMPORT = auto()  # annotate but don't add import, show warning
+    FAIL = auto()  # don't annotate, show error
+
+
+class UnpathedTypePolicy(Enum):
+    IGNORE = auto()  # annotate as documented (may not work), no warning
+    WARN = auto()  # annotate as documented (may not work), show warning
+    FAIL = auto()  # don't annotate, show error
+
+
+ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
+
+PRINTABLE_SETTINGS: Final = {
+    'PYTHON_VERSION',
+    'ALLOW_UNTYPED_ARGS',
+    'REQUIRE_RETURN_TYPE',
+    'IMPORT_COLLISION_POLICY',
+    'UNPATHED_TYPE_POLICY',
+}

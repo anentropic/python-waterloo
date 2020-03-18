@@ -72,7 +72,9 @@ def test_invalid_returns_head(example):
 
 @given(
     splat=st.text('*', min_size=0, max_size=4),
-    name=strategies.strip_whitespace_f(min_size=0, max_size=10),
+    name=strategies.strip_whitespace_f(
+        blacklist_characters="\n\r*", min_size=0, max_size=10
+    ),
     trailing_ws=strategies.whitespace_f(),
     newline=st.one_of(st.just(''), st.just('\n')),
 )
@@ -133,7 +135,7 @@ def _add_normalised_whitespace(segment):
 def _normalise_annotation(annotation):
     """
     Take a dirty annotation and strip spurious newlines and whitespace so that
-    it should match the output from an equivalent TypeAtom.to_annotation(False)
+    it should match the output from an equivalent TypeAtom.to_annotation(None)
     """
     return ''.join(
         _add_normalised_whitespace(segment.strip())
@@ -143,7 +145,7 @@ def _normalise_annotation(annotation):
 
 def assert_annotation_roundtrip(example: str, result: TypeAtom):
     normalised = _normalise_annotation(example)
-    assert normalised == result.to_annotation(False)
+    assert normalised == result.to_annotation(None)
 
 
 @given(strategies.napoleon_type_annotation_f())
@@ -268,6 +270,7 @@ def _validate_returns_section(example, result, context):
 def test_p_returns_block(returns_section):
     example, context = returns_section
     result = p_returns_block.parse(example)
+    note(repr(result))
     _validate_returns_section(example, result, context)
 
 

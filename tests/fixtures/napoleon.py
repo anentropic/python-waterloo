@@ -2,10 +2,21 @@
 Boring docstring for the module itself
 """
 import logging
+import nott.so.serious
+from ..sub import Irrelevant, Nonsense, Unused as ReallyUnused
+from serious import *
+from other.module import Product
+from some.module import Imported
+if True:
+    from some.module import ConditionallyImported
 
 logger = logging.getLogger(__name__)
 
 SOME_CONST = 1
+
+
+class TopLevel(object):
+    pass
 
 
 def first(products, getter):
@@ -20,8 +31,11 @@ def first(products, getter):
         getter (Callable[[str], Callable])
 
     Returns:
-        Dict[int, List[Dict]]: {<product id>: <product videos>}
+        Dict[int, List[ConditionallyImported]]: {<product id>: <product videos>}
     """
+    from some.module import InnerImported
+    print "Python 2 print statement"
+    print("parenthesised print statement")
     return {}
 
 
@@ -37,24 +51,32 @@ def second(products, getter):
         getter (Callable[[str], Callable]): something else
 
     Returns:
-        Dict[int, List[Dict]]
+        Dict[int, List[TopLevel]]
 
     NOTE:
         whatever
     """
+    class InnerClass(object):
+        raise ValueError, "WTF python 2"
+
     def second_inner(product, key, default):
         """
         Args:
             product (Dict[str, Any])
             key (MysteryType[str]): this type has not been imported and is not
                 defined in the document!
-            default (Any)
+            default (Imported)
 
         Raises:
             ExceptionError
         """
         pass
 
+    try:
+        third([], 1)
+    except ValueError, e:
+        # disgusting Python 2.5 exception format
+        pass
     return {}
 
 

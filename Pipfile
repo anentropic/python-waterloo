@@ -8,15 +8,18 @@ ipython = ">=7.10.1"
 ipdb = "*"
 pytest = "*"
 hypothesis = "*"
-pytype = {version="*", markers="python_version = '3.7'"}
+pytype = {version = "*",markers = "python_version = '3.7'"}
 
 [packages]
 megaparsy = "*"
-bowler = "*"
 prompt-toolkit = "*"
-typesystem = "*"
 toml = "*"
 regex = "*"
+pydantic = "*"
+typing-extensions = "*"
+bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
+parso = "*"
+inject = "*"
 
 [requires]
 python_version = ">=3.7"

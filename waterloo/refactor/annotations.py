@@ -1,7 +1,7 @@
-import re
 from threading import local
-from typing import Sequence
+from typing import Dict, Sequence
 
+import inject
 import parsy
 from bowler import Capture, Filename, LN
 from fissix.fixer_util import Newline
@@ -9,7 +9,6 @@ from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
-from waterloo.conf import settings
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.refactor.base import (
     interrupt_modifier,
@@ -17,53 +16,79 @@ from waterloo.refactor.base import (
     WaterlooQuery,
 )
 from waterloo.refactor.exceptions import Interrupt
+from waterloo.refactor.printer import (
+    report_incomplete_arg_types,
+    report_incomplete_return_type,
+    report_ambiguous_type_error,
+    report_parse_error,
+    report_settings,
+)
 from waterloo.refactor.utils import (
+    find_local_types,
     get_type_comment,
     get_import_lines,
     remove_types,
+    strategy_for_name_factory,
 )
-from waterloo.types import TypeSignature
-from waterloo.utils import StylePrinter
+from waterloo.types import (
+    AmbiguousTypeError,
+    ImportStrategy,
+)
 
 
-echo = StylePrinter(settings.get('ECHO_STYLES'))
+# used in bowler subprocesses only (not parent process)
+# for passing data between individual steps processing same source file
+threadlocals = local()
 
 
-IS_DOCSTRING_RE = re.compile(r"^(\"\"\"|''')")
-
-threadlocals = local()  # used in bowler subprocesses only
-
-
-def _init_threadlocals():
+@inject.params(settings='settings')
+def _init_threadlocals(filename, settings):
     global threadlocals
-    threadlocals.type_names = set()
+
+    threadlocals.settings = settings
+
+    local_types = find_local_types(filename)
+    threadlocals.strategy_for_name = strategy_for_name_factory(local_types)
+    threadlocals.strategy_to_names = {}
+
+    threadlocals.docstring_count = 0
+    threadlocals.typed_docstring_count = 0
     threadlocals.comment_count = 0
 
 
 def _cleanup_threadlocals():
     global threadlocals
-    try:
-        del threadlocals.type_names
-        del threadlocals.comment_count
-    except AttributeError:
-        pass
+    for key in list(threadlocals.__dict__.keys()):
+        try:
+            delattr(threadlocals, key)
+        except AttributeError:
+            pass
+
+
+def record_type_names(name_to_strategy: Dict[str, ImportStrategy]):
+    for name, strategy in name_to_strategy.items():
+        threadlocals.strategy_to_names.setdefault(strategy, set()).add(name)
 
 
 class StartFile(NonMatchingFixer):
+    echo = inject.attr('echo')
+
     def start_tree(self, tree: Node, filename: str) -> None:
-        echo.info(f"<b>{filename}</b>")
-        _init_threadlocals()
+        self.echo.info(f"<b>{filename}</b>")
+        _init_threadlocals(filename)
 
 
 class EndFile(NonMatchingFixer):
+    echo = inject.attr('echo')
+
     def finish_tree(self, tree: Node, filename: str) -> None:
         if threadlocals.comment_count:
-            echo.info(
-                f"-> <b>{threadlocals.comment_count}</b> type comments added 🎉"
+            self.echo.info(
+                f"➤➤ <b>{threadlocals.comment_count}</b> type comments added in file 🎉"
             )
         else:
-            echo.info("(no docstring types found)")
-        echo.info("")
+            self.echo.info("➤➤ (no docstrings with annotatable types found in file)")
+        self.echo.info("")
         _cleanup_threadlocals()
 
 
@@ -83,23 +108,7 @@ def f_not_already_annotated_py2(
     have used an alternation pattern (see `annotate_file` below) otherwise
     it would be a single node.
     """
-    return '# type:' not in capture['initial_indent_node'][0].prefix
-
-
-def f_has_docstring(node: LN, capture: Capture, filename: Filename) -> bool:
-    """
-    (filter)
-
-    Filter out functions which don't have a docstring that we could parse
-    for annotations.
-    """
-    try:
-        docstring_node = capture['docstring_parent_node'].children[0]
-        result = bool(IS_DOCSTRING_RE.search(docstring_node.value))
-    except (AttributeError, IndexError):
-        return False
-    capture['docstring_node'] = docstring_node
-    return result
+    return '# type:' not in capture['initial_indent_node'].prefix
 
 
 @interrupt_modifier
@@ -110,57 +119,52 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     Adds type comment annotations for functions, as understood by
     `mypy --py2` type checking.
     """
+    threadlocals.docstring_count += 1
     # since we filtered for funcs with a docstring, the initial_indent_node
     # should be the indent before the start of the docstring quotes.
-    initial_indent = capture['initial_indent_node'][0]
+    initial_indent = capture['initial_indent_node']
     function = capture['function_name']
 
     try:
         signature = docstring_parser.parse(capture['docstring_node'].value)
     except parsy.ParseError as e:
-        echo.error(
-            f"🛑 <b>line {function.lineno}:</b> Error parsing docstring for <b>def {function.value}</b>\n"
-            f"   {e!r}"
-        )
+        report_parse_error(e, function)
         raise Interrupt
 
     if not signature.has_types:
         raise Interrupt
 
     # are we okay to annotate?
+    # TODO these are currently WARN/FAIL... maybe should be OK/WARN/FAIL
+    # configurably, like for amibiguous types
     if not signature.arg_types.is_fully_typed:
-        if not settings.ALLOW_UNTYPED_ARGS:
-            echo.error(
-                f"🛑 <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types.\n"
-                f"   (no type annotation added)"
-            )
+        report_incomplete_arg_types(function)
+        if not threadlocals.settings.ALLOW_UNTYPED_ARGS:
             raise Interrupt
-        else:
-            echo.warning(
-                f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types.\n"
-                f"   -> args annotated as <b>(...)</b>"
-            )
 
     if not signature.return_type or not signature.return_type.is_fully_typed:
-        if settings.REQUIRE_RETURN_TYPE:
-            echo.error(
-                f"🛑 <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
-                f"   (no type annotation added)"
-            )
+        report_incomplete_return_type(function)
+        if threadlocals.settings.REQUIRE_RETURN_TYPE:
             raise Interrupt
-        else:
-            echo.warning(
-                f"⚠️  <b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type.\n"
-                f"   -> return annotated as <b>-> None</b>"
-            )
 
     # yes, annotate...
+    threadlocals.typed_docstring_count += 1
 
     # record types found in this docstring
-    threadlocals.type_names |= signature.type_names()
+    # and warn/fail on ambiguous types according to IMPORT_COLLISION_POLICY
+    name_to_strategy: Dict[str, ImportStrategy] = {}
+    for name in signature.type_names():
+        try:
+            name_to_strategy[name] = threadlocals.strategy_for_name(name)
+        except AmbiguousTypeError as e:
+            report_ambiguous_type_error(e, function)
+            if e.should_fail:
+                raise Interrupt
+
+    record_type_names(name_to_strategy)
 
     # add the type comment as first line of func body (before docstring)
-    type_comment = get_type_comment(signature)
+    type_comment = get_type_comment(signature, name_to_strategy)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     threadlocals.comment_count += 1
 
@@ -179,7 +183,7 @@ def _find_import_pos(root: Node) -> int:
     """
     This logic cribbed from `fissix.fix_utils.touch_import`
     ...but we want to be able to output a single import line with multiple
-    names imported from one module, so we'll use our own `_make_import_node`
+    names imported from one package, so we'll use our own `_make_import_node`
     """
 
     def _is_import(node: Node) -> bool:
@@ -220,7 +224,9 @@ def _find_import_pos(root: Node) -> int:
     return insert_pos
 
 
-def _make_import_node(left: str, right: Sequence[str]) -> Node:
+def _make_from_import_node(
+    left: str, right: Sequence[str], trailing_nl: bool = False
+) -> Node:
     assert right  # non-empty
     name_leaves = [Leaf(token.NAME, right[0], prefix=" ")]
     name_leaves.extend(
@@ -234,7 +240,24 @@ def _make_import_node(left: str, right: Sequence[str]) -> Node:
         Node(syms.import_as_names, name_leaves),
         Newline(),
     ]
+    if trailing_nl:
+        children.append(Newline())
     return Node(syms.import_from, children)
+
+
+def _make_bare_import_node(name: str, trailing_nl: bool = False) -> Node:
+    assert name  # non-empty
+    children = [
+        Leaf(token.NAME, "import"),
+        Leaf(token.NAME, name, prefix=" "),
+        Newline(),
+    ]
+    if trailing_nl:
+        children.append(Newline())
+    return Node(
+        syms.import_name,
+        children,
+    )
 
 
 class AddTypeImports(NonMatchingFixer):
@@ -242,30 +265,46 @@ class AddTypeImports(NonMatchingFixer):
     Fixer that adds imports for all the `typing` and "dotted-path" types
     found in the document. We know that builtins don't need to be imported.
     We must then assume that all the remaining types are either defined in
-    the file or already imported (for now it's "too hard" to try and detect
-    if that is true... just run `mypy --py2` and get your errors).
+    the file or already imported. If unrecognised types are specified in the
+    docstring without a dotted path then how we treat the ambiguity is
+    configured via IMPORT_COLLISION_POLICY and UNPATHED_TYPE_POLICY settings.
     """
 
     def finish_tree(self, tree: Node, filename: str) -> None:
-        imports_dict, unimported = get_import_lines(threadlocals.type_names)
-        if unimported:
-            echo.warning(
-                "⚠️  Could not determine imports for these types: {}\n"
-                "   (will assume types already imported or defined in file)".format(
-                    f", ".join(
-                        f"<b>{name}</b>"
-                        for name in sorted(unimported)
-                    )
-                )
-            )
-
+        # TODO: what about name clash between dotted-path imports and
+        # introspected locals?
+        imports_dict = get_import_lines(threadlocals.strategy_to_names)
         insert_pos = _find_import_pos(tree)
-        for left, right in sorted(imports_dict.items(), reverse=True):
-            import_node = _make_import_node(left, sorted(right))
-            tree.insert_child(insert_pos, import_node)
+
+        def _sort_key(val):
+            left, right = val
+            left = left or ""
+            return (left, right)
+
+        sorted_tuples = sorted(
+            imports_dict.items(),
+            key=_sort_key,
+            reverse=True,  # because we insert last nodes first
+        )
+        for i, (left, right) in enumerate(sorted_tuples):
+            if left:
+                import_node = _make_from_import_node(
+                    left=left,
+                    right=sorted(right),
+                    trailing_nl=i == 0 and insert_pos == 0,
+                )
+                tree.insert_child(insert_pos, import_node)
+            else:
+                for j, name in enumerate(right):
+                    import_node = _make_bare_import_node(
+                        name=name,
+                        trailing_nl=i == 0 and j == 0 and insert_pos == 0,
+                    )
+                    tree.insert_child(insert_pos, import_node)
 
 
-def annotate(*paths: str, **execute_kwargs):
+@inject.params(settings='settings', echo='echo')
+def annotate(*paths: str, settings, echo, **execute_kwargs):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
@@ -286,32 +325,24 @@ def annotate(*paths: str, **execute_kwargs):
         **execute_kwargs: passed into the bowler `Query.execute()` method
     """
     echo.debug("Running with options:")
-    for key, val in settings.items():
-        echo.debug(f"- {key}: <b>{val!r}</b>")
-    echo.debug("")
-
-    # generate pattern-match for every indent level up to `max_indent_level`
-    indent_patterns = "|".join(
-        "'%s'" % (settings.INDENT * i)
-        for i in range(1, settings.MAX_INDENT_LEVEL + 1)
-    )
+    report_settings()
 
     q = (
-        WaterlooQuery(*paths)
-        .select(
-            r"""
-            funcdef<
+        WaterlooQuery(
+            *paths,
+            python_version=int(str(settings.PYTHON_VERSION).split(".", 1)[0]),
+        )
+        .select(r"""
+            funcdef <
                 'def' function_name=any
                 any* ':'
-                suite< '\n'
-                    initial_indent_node=(%s)
-                    docstring_parent_node=simple_stmt< any* >
+                suite < '\n'
+                    initial_indent_node=any
+                    simple_stmt < docstring_node=STRING any* >
                     any*
                 >
             >
-            """ % indent_patterns
-        )
-        .filter(f_has_docstring)
+        """)
         .filter(f_not_already_annotated_py2)
         .modify(m_add_type_comment)
         .raw_fixer(StartFile)

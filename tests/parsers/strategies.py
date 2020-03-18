@@ -45,13 +45,15 @@ def whitespace_f(draw, min_size=0, max_size=10):
 
 
 @st.composite
-def strip_whitespace_f(draw, *args, **kwargs):
+def strip_whitespace_f(draw, blacklist_characters="\n\r", *args, **kwargs):
     """
     Drawn from (by default) the full range of Hypothesis' `text` strategy
     but eliminating initial/trailing whitespace chars, including \n, but
     not from middle of string.
     """
-    kwargs['alphabet'] = st.characters(blacklist_characters="\n\r")
+    kwargs['alphabet'] = st.characters(
+        blacklist_characters=blacklist_characters
+    )
     val = draw(st.text(*args, **kwargs))
     assume(val.strip() == val)
     return val
@@ -256,7 +258,7 @@ def napoleon_type_annotation_f(draw):
     - before a `]`
     """
     type_atom = draw(type_atom_f())
-    annotation = type_atom.to_annotation(False)
+    annotation = type_atom.to_annotation(None)
     return ''.join(
         _add_arbitrary_whitespace(
             segment=segment.strip(),

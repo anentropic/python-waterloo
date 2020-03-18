@@ -59,7 +59,7 @@ from waterloo.types import (
     )
 ])
 def test_get_type_comment(example, expected):
-    val = get_type_comment(example)
+    val = get_type_comment(example, name_to_strategy={})
     assert val == expected
 
 
