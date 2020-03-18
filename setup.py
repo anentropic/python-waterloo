@@ -61,6 +61,7 @@ setup(
         'pydantic>=1.4,<1.5',
         'typing-extensions>=3.7,<3.8',
         'parso>=0.6,<0.7',
+        'Inject>=4.1,<4.2',
     ],
 
     packages=[
