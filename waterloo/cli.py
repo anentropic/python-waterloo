@@ -39,8 +39,8 @@ def main(settings):
         help='List of file or directory paths to process.',
     )
 
-    general_group = annotate_cmd.add_argument_group('general options')
-    general_group.add_argument(
+    annotation_group = annotate_cmd.add_argument_group('annotation options')
+    annotation_group.add_argument(
         '-p', '--python-version', type=str,
         default=settings.PYTHON_VERSION,
         help="We can refactor either Python 2 or Python 3 source files but "
@@ -51,8 +51,6 @@ def main(settings):
         "can only be a function. We also use `parso` library which can "
         "benefit from knowing <major>.<minor> version of your sources."
     )
-
-    annotation_group = annotate_cmd.add_argument_group('annotation options')
     annotation_group.add_argument(
         '-aa', '--allow-untyped-args', action='store_true',
         default=settings.ALLOW_UNTYPED_ARGS,
