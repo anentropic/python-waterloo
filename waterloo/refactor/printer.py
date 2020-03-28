@@ -3,7 +3,7 @@ from functools import singledispatch
 
 import inject
 import parsy
-from bowler import Capture
+from fissix.pytree import Leaf
 
 from waterloo.types import (
     AmbiguousTypeError,
@@ -34,7 +34,7 @@ def report_settings(settings, echo):
 
 
 @inject.params(echo='echo')
-def report_parse_error(e: parsy.ParseError, function: Capture, echo):
+def report_parse_error(e: parsy.ParseError, function: Leaf, echo):
     echo.error(
         f"🛑 <b>line {function.lineno}:</b> Error parsing docstring for <b>def {function.value}</b>\n"
         f"   {e!r}"
@@ -42,7 +42,7 @@ def report_parse_error(e: parsy.ParseError, function: Capture, echo):
 
 
 @inject.params(settings='settings', echo='echo')
-def report_incomplete_arg_types(function: Capture, settings, echo):
+def report_incomplete_arg_types(function: Leaf, settings, echo):
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types."
     if not settings.ALLOW_UNTYPED_ARGS:
         echo.error(
@@ -57,7 +57,7 @@ def report_incomplete_arg_types(function: Capture, settings, echo):
 
 
 @inject.params(settings='settings', echo='echo')
-def report_incomplete_return_type(function: Capture, settings, echo):
+def report_incomplete_return_type(function: Leaf, settings, echo):
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type."
     if settings.REQUIRE_RETURN_TYPE:
         echo.error(
@@ -74,7 +74,7 @@ def report_incomplete_return_type(function: Capture, settings, echo):
 @singledispatch
 def report_ambiguous_type_error(
     e: AmbiguousTypeError,
-    function: Capture,
+    function: Leaf,
 ):
     raise TypeError(
         f"Unexpected AmbiguousTypeError: {e!r}"
@@ -85,7 +85,7 @@ def report_ambiguous_type_error(
 @inject.params(settings='settings', echo='echo')
 def _(
     e: ModuleHasStarImportError,
-    function: Capture,
+    function: Leaf,
     settings,
     echo,
 ):
@@ -118,7 +118,7 @@ def _(
 @inject.params(settings='settings', echo='echo')
 def _(
     e: NameMatchesLocalClassError,
-    function: Capture,
+    function: Leaf,
     settings,
     echo,
 ):
@@ -151,7 +151,7 @@ def _(
 @inject.params(settings='settings', echo='echo')
 def _(
     e: NameMatchesRelativeImportError,
-    function: Capture,
+    function: Leaf,
     settings,
     echo,
 ):
@@ -184,7 +184,7 @@ def _(
 @inject.params(settings='settings', echo='echo')
 def _(
     e: NotFoundNoPathError,
-    function: Capture,
+    function: Leaf,
     settings,
     echo,
 ):
