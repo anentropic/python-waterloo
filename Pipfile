@@ -17,9 +17,15 @@ toml = "*"
 regex = "*"
 pydantic = "*"
 typing-extensions = "*"
-bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
+# bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
 parso = "*"
 inject = "*"
+# Bowler deps:
+attrs = "*"
+click = "*"
+fissix = "*"
+moreorless = ">=0.2.0"
+volatile = "*"
 
 [requires]
 python_version = ">=3.7"
