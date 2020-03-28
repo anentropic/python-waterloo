@@ -21,8 +21,8 @@ _(It can be run on Python 3 source files too, but since we add type-comments you
 For this reason it is best installed using [pipx](https://github.com/pipxproject/pipx):
 
 ```
-$ pipx install https://github.com/anentropic/python-waterloo/archive/0.4.0.zip
-  installed package waterloo 0.4.0, Python 3.7.6
+$ pipx install waterloo
+  installed package waterloo 0.5.0, Python 3.7.6
   These apps are now globally available
     - waterloo
 done! ✨ 🌟 ✨
