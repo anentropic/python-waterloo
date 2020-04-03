@@ -45,6 +45,10 @@ To preview the changes without committing them:
 waterloo annotate my-project-dir/ --show-diff
 ```
 
+Waterloo will _remove_ the type info from the docstrings, since it is now redundant. We assume you'll be using a type-checker like mypy to validate the annotations, so you don't want type info in the docstrings that can go outo of sync.
+
+If you are using Sphinx to generate documentation from your docstrings you can use the [`sphinx-autodoc-typehints`](https://github.com/agronholm/sphinx-autodoc-typehints#using-type-hint-comments) plugin to ensure the type info is still present in your docs.
+
 ### CLI options
 
 ```
