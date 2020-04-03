@@ -14,7 +14,6 @@ from megaparsy.char.lexer import (
     line_fold,
 )
 from megaparsy.control.applicative.combinators import between
-from megaparsy.utils import try_
 
 from waterloo.types import (
     ArgsSection,
