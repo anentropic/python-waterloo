@@ -41,7 +41,6 @@ from .types import (
     Capture,
     Filename,
     FilenameMatcher,
-    Filter,
     Hunk,
     Processor,
     Stringish,

@@ -14,7 +14,8 @@ shell:
 	PYTHONPATH=waterloo:tests:$$PYTHONPATH ipython
 
 typecheck:
-	pytype waterloo
+	# `-d import-error` needed due to issue with pydantic
+	pytype -d import-error waterloo
 
 pytest:
 	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/

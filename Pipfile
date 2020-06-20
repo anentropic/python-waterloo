@@ -8,7 +8,7 @@ ipython = ">=7.10.1"
 ipdb = "*"
 pytest = "*"
 hypothesis = "*"
-pytype = {version = "*",markers = "python_version = '3.7'"}
+pytype = {version = "*",markers = "python_version < '3.8'"}
 
 [packages]
 megaparsy = "*"
@@ -28,7 +28,7 @@ moreorless = ">=0.2.0"
 volatile = "*"
 
 [requires]
-python_version = ">=3.7"
+python_version = "^3.7"
 
 [pipenv]
 allow_prereleases = true

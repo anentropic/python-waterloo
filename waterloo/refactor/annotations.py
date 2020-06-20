@@ -9,6 +9,7 @@ from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
 
+from waterloo.conf.types import Settings
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.refactor.base import (
     interrupt_modifier,
@@ -17,6 +18,7 @@ from waterloo.refactor.base import (
 )
 from waterloo.refactor.exceptions import Interrupt
 from waterloo.refactor.printer import (
+    report_doc_args_signature_mismatch_error,
     report_incomplete_arg_types,
     report_incomplete_return_type,
     report_ambiguous_type_error,
@@ -24,6 +26,7 @@ from waterloo.refactor.printer import (
     report_settings,
 )
 from waterloo.refactor.utils import (
+    args_annotations_match_signature,
     find_local_types,
     get_type_comment,
     get_import_lines,
@@ -32,7 +35,9 @@ from waterloo.refactor.utils import (
 )
 from waterloo.types import (
     AmbiguousTypeError,
+    ArgTypes,
     ImportStrategy,
+    TypeSignature,
 )
 
 
@@ -124,25 +129,46 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # should be the indent before the start of the docstring quotes.
     initial_indent = capture['initial_indent_node']
     function = capture['function_name']
+    signature = capture['function_arguments']
 
     try:
-        signature = docstring_parser.parse(capture['docstring_node'].value)
+        doc_annotation = docstring_parser.parse(capture['docstring_node'].value)
     except parsy.ParseError as e:
         report_parse_error(e, function)
         raise Interrupt
 
-    if not signature.has_types:
+    if not doc_annotation.has_types:
         raise Interrupt
+
+    signatures_match = args_annotations_match_signature(
+        arg_annotations=doc_annotation.arg_types.args if doc_annotation.arg_types else {},
+        signature=signature,
+    )
+    if doc_annotation.arg_types and not signatures_match:
+        report_doc_args_signature_mismatch_error(function)
+        raise Interrupt
+    # we either have no annotation args, or we do and the names match the signature
 
     # are we okay to annotate?
     # TODO these are currently WARN/FAIL... maybe should be OK/WARN/FAIL
     # configurably, like for amibiguous types
-    if not signature.arg_types.is_fully_typed:
+    if (
+        signature and (
+            not doc_annotation.arg_types or not doc_annotation.arg_types.is_fully_typed
+        )
+    ):
         report_incomplete_arg_types(function)
         if not threadlocals.settings.ALLOW_UNTYPED_ARGS:
             raise Interrupt
+    elif not signature and not doc_annotation.arg_types:
+        # special case: replace doc_annotation with one having empty args
+        # (rather than `None`)
+        doc_annotation = TypeSignature.factory(
+            arg_types=ArgTypes.no_args_factory(),
+            return_type=doc_annotation.return_type,
+        )
 
-    if not signature.return_type or not signature.return_type.is_fully_typed:
+    if not doc_annotation.return_type or not doc_annotation.return_type.is_fully_typed:
         report_incomplete_return_type(function)
         if threadlocals.settings.REQUIRE_RETURN_TYPE:
             raise Interrupt
@@ -150,10 +176,10 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # yes, annotate...
     threadlocals.typed_docstring_count += 1
 
-    # record types found in this docstring
+    # record the types we found in this docstring
     # and warn/fail on ambiguous types according to IMPORT_COLLISION_POLICY
     name_to_strategy: Dict[str, ImportStrategy] = {}
-    for name in signature.type_names():
+    for name in doc_annotation.type_names():
         try:
             name_to_strategy[name] = threadlocals.strategy_for_name(name)
         except AmbiguousTypeError as e:
@@ -164,7 +190,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     record_type_names(name_to_strategy)
 
     # add the type comment as first line of func body (before docstring)
-    type_comment = get_type_comment(signature, name_to_strategy)
+    type_comment = get_type_comment(doc_annotation, name_to_strategy)
     initial_indent.prefix = f"{initial_indent}{type_comment}\n"
     threadlocals.comment_count += 1
 
@@ -172,7 +198,7 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     new_docstring_node = capture['docstring_node'].clone()
     new_docstring_node.value = remove_types(
         docstring=capture['docstring_node'].value,
-        signature=signature,
+        signature=doc_annotation,
     )
     capture['docstring_node'].replace(new_docstring_node)
 
@@ -304,7 +330,7 @@ class AddTypeImports(NonMatchingFixer):
 
 
 @inject.params(settings='settings', echo='echo')
-def annotate(*paths: str, settings, echo, **execute_kwargs):
+def annotate(*paths: str, settings: Settings, echo, **execute_kwargs):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
@@ -314,14 +340,8 @@ def annotate(*paths: str, settings, echo, **execute_kwargs):
 
     Args:
         *paths: files to process (dir paths are ok too)
-        project_indent: due to limits of bowler we can't really detect the
-            indentation of the file and then use that in the `select` pattern
-            like we'd need to, so let's hope you use consistent indentation
-            throughout your project!
-        max_indent_level: again because of bowler/lib2to3 limitation, we have
-            to pre-generate pattern matches for all the indent levels in the
-            document, but we can't measure it so just use an arbitrary large
-            enough number.
+        settings: dependency-injected settings object
+        echo: dependency-injected pretty-printing logger
         **execute_kwargs: passed into the bowler `Query.execute()` method
     """
     echo.debug("Running with options:")
@@ -335,6 +355,7 @@ def annotate(*paths: str, settings, echo, **execute_kwargs):
         .select(r"""
             funcdef <
                 'def' function_name=any
+                function_parameters=parameters< '(' function_arguments=any* ')' >
                 any* ':'
                 suite < '\n'
                     initial_indent_node=any
