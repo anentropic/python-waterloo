@@ -5,7 +5,6 @@ import regex as better_re
 
 from waterloo.types import SourcePos
 
-
 TypedMarkReturnT = Tuple[SourcePos, Any, SourcePos]
 
 

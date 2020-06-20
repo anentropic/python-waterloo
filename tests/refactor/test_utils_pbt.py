@@ -2,10 +2,9 @@ import pprint
 
 from hypothesis import given, note
 
+from tests.parsers import strategies
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.refactor.utils import remove_types
-
-from tests.parsers import strategies
 
 
 @given(strategies.napoleon_docstring_f())
@@ -15,7 +14,7 @@ def test_remove_types(docstring):
     signature = docstring_parser.parse(example)
     result = remove_types(example, signature)
 
-    expected = context['example_no_type']
+    expected = context["example_no_type"]
 
     note(f"signature: {pprint.pformat(signature)}")
     note(f"context: {pprint.pformat(context)}")

@@ -60,7 +60,7 @@ setup(
         'regex>=2020.2.20',
         'pydantic>=1.4,<1.5',
         'typing-extensions>=3.7,<3.8',
-        'parso>=0.6,<0.7',
+        'parso>=0.7,<0.8',
         'Inject>=4.1,<4.2',
         # Bowler deps:
         'attrs',

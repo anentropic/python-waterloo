@@ -1,63 +1,55 @@
 from __future__ import annotations
+
 from collections import OrderedDict
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import singledispatch
-from typing import (
-    Dict,
-    Iterable,
-    NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-)
-from typing_extensions import Final
+from typing import Dict, Iterable, NamedTuple, Optional, Set, Tuple
 
 import inject
+from typing_extensions import Final
 
 
 class ArgsSection(str, Enum):
-    ARGS = 'Args'
+    ARGS = "Args"
 
 
 class ReturnsSection(str, Enum):
-    RETURNS = 'Returns'
-    YIELDS = 'Yields'
+    RETURNS = "Returns"
+    YIELDS = "Yields"
 
 
 class Types(str, Enum):
-    ELLIPSIS = '...'
-    NONE = 'None'
+    ELLIPSIS = "..."
+    NONE = "None"
 
 
 # https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#docstring-sections
 VALID_ARGS_SECTION_NAMES: Final = {
-    'Args',
-    'Kwargs',  # not an official part of Napoleon spec but frequently used
-    'Arguments',
-    'Keyword Args',
-    'Keyword Arguments',
-    'Parameters',
+    "Args",
+    "Kwargs",  # not an official part of Napoleon spec but frequently used
+    "Arguments",
+    "Keyword Args",
+    "Keyword Arguments",
+    "Parameters",
 }
 
 VALID_RETURNS_SECTION_NAMES: Final = {
-    'Return': (r'Return(?!s)', ReturnsSection.RETURNS),
-    'Returns': (r'Returns', ReturnsSection.RETURNS),
-    'Yield': (r'Yield(?!s)', ReturnsSection.YIELDS),
-    'Yields': (r'Yields', ReturnsSection.YIELDS),
+    "Return": (r"Return(?!s)", ReturnsSection.RETURNS),
+    "Returns": (r"Returns", ReturnsSection.RETURNS),
+    "Yield": (r"Yield(?!s)", ReturnsSection.YIELDS),
+    "Yields": (r"Yields", ReturnsSection.YIELDS),
 }
 
-NameToStrategy_T = Dict[str, 'ImportStrategy']
+NameToStrategy_T = Dict[str, "ImportStrategy"]
 
 
 class TypeAtom(NamedTuple):
     name: str
-    args: Iterable['TypeAtom']
+    args: Iterable["TypeAtom"]
 
-    def to_annotation(
-        self, name_to_strategy: Optional[NameToStrategy_T]
-    ) -> str:
+    def to_annotation(self, name_to_strategy: Optional[NameToStrategy_T]) -> str:
         name = _repr_type_arg(self.name, name_to_strategy)
         if self.args:
             args_annotations = _repr_type_arg(self.args, name_to_strategy)
@@ -83,10 +75,7 @@ class TypeAtom(NamedTuple):
 
 
 def should_strip_path(name: str, strategy: Optional[ImportStrategy]) -> bool:
-    return (
-        name != Types.ELLIPSIS and
-        strategy not in DOTTED_PATH_STRATEGIES
-    )
+    return name != Types.ELLIPSIS and strategy not in DOTTED_PATH_STRATEGIES
 
 
 @singledispatch
@@ -104,11 +93,10 @@ def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     unless we find ImportStrategy.ADD_DOTTED
     """
     # `val` is the name from TypeAtom
-    if (
-        name_to_strategy is not None
-        and should_strip_path(val, name_to_strategy.get(val))
+    if name_to_strategy is not None and should_strip_path(
+        val, name_to_strategy.get(val)
     ):
-        val = val.rsplit('.', maxsplit=1)[-1]
+        val = val.rsplit(".", maxsplit=1)[-1]
     return val
 
 
@@ -118,15 +106,11 @@ def _(arg: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
 
 
 @_repr_type_arg.register(IterableABC)
-def _(
-    val: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]
-) -> str:
+def _(val: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]) -> str:
     if not val:
         return ""
     # recurse
-    sub_args = ", ".join(
-        _repr_type_arg(sub, name_to_strategy) for sub in val
-    )
+    sub_args = ", ".join(_repr_type_arg(sub, name_to_strategy) for sub in val)
     return f"[{sub_args}]"
 
 
@@ -135,16 +119,10 @@ class SourcePos(NamedTuple):
     col: int
 
     def __add__(self, other):
-        return SourcePos(
-            self[0] + other[0],
-            self[1] + other[1],
-        )
+        return SourcePos(self[0] + other[0], self[1] + other[1],)
 
     def __sub__(self, other):
-        return SourcePos(
-            self[0] - other[0],
-            self[1] - other[1],
-        )
+        return SourcePos(self[0] - other[0], self[1] - other[1],)
 
 
 class TypeDef(NamedTuple):
@@ -158,12 +136,8 @@ class TypeDef(NamedTuple):
         start_pos: Tuple[int, int],
         type_atom: Tuple[str, Iterable[TypeAtom]],
         end_pos: Tuple[int, int],
-    ) -> 'TypeDef':
-        return cls(
-            SourcePos(*start_pos),
-            TypeAtom(*type_atom),
-            SourcePos(*end_pos),
-        )
+    ) -> "TypeDef":
+        return cls(SourcePos(*start_pos), TypeAtom(*type_atom), SourcePos(*end_pos),)
 
     @property
     def name(self) -> str:
@@ -173,9 +147,7 @@ class TypeDef(NamedTuple):
     def args(self) -> Iterable[TypeAtom]:
         return self.type_atom.args
 
-    def to_annotation(
-        self, name_to_strategy: Optional[NameToStrategy_T]
-    ) -> str:
+    def to_annotation(self, name_to_strategy: Optional[NameToStrategy_T]) -> str:
         return self.type_atom.to_annotation(name_to_strategy)
 
     def type_names(self) -> Set[str]:
@@ -192,30 +164,20 @@ class ArgTypes:
     @classmethod
     def factory(
         cls, name: ArgsSection, args: OrderedDict[str, Optional[TypeDef]]
-    ) -> 'ArgTypes':
+    ) -> "ArgTypes":
         """
         We need all args to have a type, otherwise we can't output a valid
         py2 type comment. This is indicated by `is_fully_typed`.
         """
-        is_fully_typed = all(
-            arg is not None for arg in args.values()
-        )
-        return cls(
-            name=name,
-            args=args,
-            is_fully_typed=is_fully_typed,
-        )
+        is_fully_typed = all(arg is not None for arg in args.values())
+        return cls(name=name, args=args, is_fully_typed=is_fully_typed,)
 
     @classmethod
-    def no_args_factory(cls) -> 'ArgTypes':
+    def no_args_factory(cls) -> "ArgTypes":
         """
         For a function with no args in its real signature.
         """
-        return cls(
-            name=ArgsSection.ARGS,
-            args={},
-            is_fully_typed=True,
-        )
+        return cls(name=ArgsSection.ARGS, args={}, is_fully_typed=True,)
 
     def type_names(self) -> Set[str]:
         names: Set[str] = set()
@@ -233,19 +195,13 @@ class ReturnType:
     is_fully_typed: bool
 
     @classmethod
-    def factory(
-        cls, name: ReturnsSection, type_def: Optional[TypeDef]
-    ) -> 'ReturnType':
+    def factory(cls, name: ReturnsSection, type_def: Optional[TypeDef]) -> "ReturnType":
         """
         (I'm not sure our parser would ever return a `ReturnType` with no
         `type_atom` so `is_fully_typed` is likely always `True`)
         """
         is_fully_typed = type_def is not None
-        return cls(
-            name=name,
-            type_def=type_def,
-            is_fully_typed=is_fully_typed,
-        )
+        return cls(name=name, type_def=type_def, is_fully_typed=is_fully_typed,)
 
     def type_names(self) -> Set[str]:
         if self.type_def:
@@ -264,18 +220,16 @@ class TypeSignature:
     @classmethod
     def factory(
         cls, arg_types: Optional[ArgTypes], return_type: Optional[ReturnType]
-    ) -> 'TypeSignature':
+    ) -> "TypeSignature":
         """
         If `return_type is None` we can (optionally) assume the signature
         should be `-> None`. For everything else we require `is_fully_typed`.
         """
         has_types = bool(arg_types or return_type)
         is_fully_typed = bool(
-            arg_types and arg_types.is_fully_typed
-            and (
-                return_type is None
-                or return_type.is_fully_typed
-            )
+            arg_types
+            and arg_types.is_fully_typed
+            and (return_type is None or return_type.is_fully_typed)
         )
         return cls(
             arg_types=arg_types,
@@ -303,12 +257,9 @@ class LocalTypes:
     all_names: Set[str]
 
     @classmethod
-    def empty(cls) -> 'LocalTypes':
+    def empty(cls) -> "LocalTypes":
         return cls(
-            class_defs=set(),
-            star_imports=set(),
-            names_to_packages={},
-            all_names=set(),
+            class_defs=set(), star_imports=set(), names_to_packages={}, all_names=set(),
         )
 
     def update_all_names(self):
@@ -321,7 +272,7 @@ class LocalTypes:
         star_imports: Set[str],
         names_to_packages: Dict[str, str],
         package_imports: Set[str],
-    ) -> 'LocalTypes':
+    ) -> "LocalTypes":
         # should be no overlap in names, that would be a bug in the src file!
         assert not class_defs & names_to_packages.keys()
         return cls(
@@ -362,13 +313,11 @@ DOTTED_PATH_STRATEGIES: Final = {
 
 
 class AmbiguousTypeError(Exception):
-    settings = inject.attr('settings')
+    settings = inject.attr("settings")
 
     @property
     def should_fail(self):
-        return (
-            self.settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.FAIL
-        )
+        return self.settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.FAIL
 
 
 class ModuleHasStarImportError(AmbiguousTypeError):
@@ -401,12 +350,25 @@ class UnpathedTypePolicy(Enum):
     FAIL = auto()  # don't annotate, show error
 
 
-ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
+class LogLevel(Enum):
+    DEBUG = 0
+    INFO = 1
+    WARNING = 2
+    ERROR = 3
+
+
+LOG_LEVEL_LABELS: Final = {
+    LogLevel.DEBUG: "debug",
+    LogLevel.INFO: "info",
+    LogLevel.WARNING: "warning",
+    LogLevel.ERROR: "error",
+}
+
 
 PRINTABLE_SETTINGS: Final = {
-    'PYTHON_VERSION',
-    'ALLOW_UNTYPED_ARGS',
-    'REQUIRE_RETURN_TYPE',
-    'IMPORT_COLLISION_POLICY',
-    'UNPATHED_TYPE_POLICY',
+    "PYTHON_VERSION",
+    "ALLOW_UNTYPED_ARGS",
+    "REQUIRE_RETURN_TYPE",
+    "IMPORT_COLLISION_POLICY",
+    "UNPATHED_TYPE_POLICY",
 }

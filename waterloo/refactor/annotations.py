@@ -3,7 +3,7 @@ from typing import Dict, Sequence
 
 import inject
 import parsy
-from bowler import Capture, Filename, LN
+from bowler import LN, Capture, Filename
 from fissix.fixer_util import Newline
 from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
@@ -11,42 +11,33 @@ from fissix.pytree import Leaf, Node
 
 from waterloo.conf.types import Settings
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.refactor.base import (
-    interrupt_modifier,
-    NonMatchingFixer,
-    WaterlooQuery,
-)
+from waterloo.refactor.base import NonMatchingFixer, WaterlooQuery, interrupt_modifier
 from waterloo.refactor.exceptions import Interrupt
 from waterloo.refactor.printer import (
+    report_ambiguous_type_error,
     report_doc_args_signature_mismatch_error,
     report_incomplete_arg_types,
     report_incomplete_return_type,
-    report_ambiguous_type_error,
     report_parse_error,
     report_settings,
 )
 from waterloo.refactor.utils import (
     args_annotations_match_signature,
     find_local_types,
-    get_type_comment,
     get_import_lines,
+    get_type_comment,
     remove_types,
     strategy_for_name_factory,
 )
-from waterloo.types import (
-    AmbiguousTypeError,
-    ArgTypes,
-    ImportStrategy,
-    TypeSignature,
-)
-
+from waterloo.types import AmbiguousTypeError, ArgTypes, ImportStrategy, TypeSignature
+from waterloo.utils import StylePrinter
 
 # used in bowler subprocesses only (not parent process)
 # for passing data between individual steps processing same source file
 threadlocals = local()
 
 
-@inject.params(settings='settings')
+@inject.params(settings="settings")
 def _init_threadlocals(filename, settings):
     global threadlocals
 
@@ -76,7 +67,7 @@ def record_type_names(name_to_strategy: Dict[str, ImportStrategy]):
 
 
 class StartFile(NonMatchingFixer):
-    echo = inject.attr('echo')
+    echo = inject.attr("echo")
 
     def start_tree(self, tree: Node, filename: str) -> None:
         self.echo.info(f"<b>{filename}</b>")
@@ -84,7 +75,7 @@ class StartFile(NonMatchingFixer):
 
 
 class EndFile(NonMatchingFixer):
-    echo = inject.attr('echo')
+    echo = inject.attr("echo")
 
     def finish_tree(self, tree: Node, filename: str) -> None:
         if threadlocals.comment_count:
@@ -97,9 +88,7 @@ class EndFile(NonMatchingFixer):
         _cleanup_threadlocals()
 
 
-def f_not_already_annotated_py2(
-    node: LN, capture: Capture, filename: Filename
-) -> bool:
+def f_not_already_annotated_py2(node: LN, capture: Capture, filename: Filename) -> bool:
     """
     (filter)
 
@@ -113,7 +102,7 @@ def f_not_already_annotated_py2(
     have used an alternation pattern (see `annotate_file` below) otherwise
     it would be a single node.
     """
-    return '# type:' not in capture['initial_indent_node'].prefix
+    return "# type:" not in capture["initial_indent_node"].prefix
 
 
 @interrupt_modifier
@@ -127,12 +116,12 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     threadlocals.docstring_count += 1
     # since we filtered for funcs with a docstring, the initial_indent_node
     # should be the indent before the start of the docstring quotes.
-    initial_indent = capture['initial_indent_node']
-    function = capture['function_name']
-    signature = capture['function_arguments']
+    initial_indent = capture["initial_indent_node"]
+    function = capture["function_name"]
+    signature = capture["function_arguments"]
 
     try:
-        doc_annotation = docstring_parser.parse(capture['docstring_node'].value)
+        doc_annotation = docstring_parser.parse(capture["docstring_node"].value)
     except parsy.ParseError as e:
         report_parse_error(e, function)
         raise Interrupt
@@ -141,7 +130,9 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
         raise Interrupt
 
     signatures_match = args_annotations_match_signature(
-        arg_annotations=doc_annotation.arg_types.args if doc_annotation.arg_types else {},
+        arg_annotations=doc_annotation.arg_types.args
+        if doc_annotation.arg_types
+        else {},
         signature=signature,
     )
     if doc_annotation.arg_types and not signatures_match:
@@ -152,10 +143,8 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # are we okay to annotate?
     # TODO these are currently WARN/FAIL... maybe should be OK/WARN/FAIL
     # configurably, like for amibiguous types
-    if (
-        signature and (
-            not doc_annotation.arg_types or not doc_annotation.arg_types.is_fully_typed
-        )
+    if signature and (
+        not doc_annotation.arg_types or not doc_annotation.arg_types.is_fully_typed
     ):
         report_incomplete_arg_types(function)
         if not threadlocals.settings.ALLOW_UNTYPED_ARGS:
@@ -195,12 +184,11 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     threadlocals.comment_count += 1
 
     # remove types from docstring
-    new_docstring_node = capture['docstring_node'].clone()
+    new_docstring_node = capture["docstring_node"].clone()
     new_docstring_node.value = remove_types(
-        docstring=capture['docstring_node'].value,
-        signature=doc_annotation,
+        docstring=capture["docstring_node"].value, signature=doc_annotation,
     )
-    capture['docstring_node'].replace(new_docstring_node)
+    capture["docstring_node"].replace(new_docstring_node)
 
     return node
 
@@ -255,10 +243,7 @@ def _make_from_import_node(
 ) -> Node:
     assert right  # non-empty
     name_leaves = [Leaf(token.NAME, right[0], prefix=" ")]
-    name_leaves.extend(
-        Leaf(token.NAME, name, prefix=", ")
-        for name in right[1:]
-    )
+    name_leaves.extend(Leaf(token.NAME, name, prefix=", ") for name in right[1:])
     children = [
         Leaf(token.NAME, "from"),
         Leaf(token.NAME, left, prefix=" "),
@@ -280,10 +265,7 @@ def _make_bare_import_node(name: str, trailing_nl: bool = False) -> Node:
     ]
     if trailing_nl:
         children.append(Newline())
-    return Node(
-        syms.import_name,
-        children,
-    )
+    return Node(syms.import_name, children,)
 
 
 class AddTypeImports(NonMatchingFixer):
@@ -323,14 +305,15 @@ class AddTypeImports(NonMatchingFixer):
             else:
                 for j, name in enumerate(right):
                     import_node = _make_bare_import_node(
-                        name=name,
-                        trailing_nl=i == 0 and j == 0 and insert_pos == 0,
+                        name=name, trailing_nl=i == 0 and j == 0 and insert_pos == 0,
                     )
                     tree.insert_child(insert_pos, import_node)
 
 
-@inject.params(settings='settings', echo='echo')
-def annotate(*paths: str, settings: Settings, echo, **execute_kwargs):
+@inject.params(settings="settings", echo="echo")
+def annotate(
+    *paths: str, settings: Settings = None, echo: StylePrinter = None, **execute_kwargs
+):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
@@ -349,10 +332,10 @@ def annotate(*paths: str, settings: Settings, echo, **execute_kwargs):
 
     q = (
         WaterlooQuery(
-            *paths,
-            python_version=int(str(settings.PYTHON_VERSION).split(".", 1)[0]),
+            *paths, python_version=int(str(settings.PYTHON_VERSION).split(".", 1)[0]),
         )
-        .select(r"""
+        .select(
+            r"""
             funcdef <
                 'def' function_name=any
                 function_parameters=parameters< '(' function_arguments=any* ')' >
@@ -363,7 +346,8 @@ def annotate(*paths: str, settings: Settings, echo, **execute_kwargs):
                     any*
                 >
             >
-        """)
+        """
+        )
         .filter(f_not_already_annotated_py2)
         .modify(m_add_type_comment)
         .raw_fixer(StartFile)

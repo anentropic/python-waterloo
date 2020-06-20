@@ -2,7 +2,6 @@ import parsy
 
 from .utils import regex
 
-
 """
 Rules for python identifiers:
 https://docs.python.org/3.3/reference/lexical_analysis.html#identifiers
@@ -19,7 +18,7 @@ ID_CONTINUE = ID_START + r"\p{Mn}\p{Mc}\p{Nd}\p{Pc}\p{Other_ID_Continue}"
 
 @parsy.generate
 def python_identifier() -> parsy.Parser:
-    name = yield regex(f'[{ID_START}][{ID_CONTINUE}]*')
+    name = yield regex(f"[{ID_START}][{ID_CONTINUE}]*")
     if name.isidentifier():
         return name
     else:

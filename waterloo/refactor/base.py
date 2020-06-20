@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import List, Optional, Type
 
-from bowler import Capture, Filename, LN, Query
+from bowler import LN, Capture, Filename, Query
 from fissix.fixer_base import BaseFix
 
 from waterloo.refactor.exceptions import Interrupt
@@ -32,6 +32,7 @@ class WaterlooQuery(Query):
 
     See https://github.com/jreese/fissix/blob/master/fissix/fixer_base.py
     """
+
     raw_fixers: List[Type[BaseFix]]
 
     def __init__(self, *paths, **kwargs) -> None:
@@ -56,4 +57,5 @@ def interrupt_modifier(f):
             return f(node=node, capture=capture, filename=filename)
         except Interrupt:
             return node
+
     return decorated

@@ -3,20 +3,13 @@ import tempfile
 import inject
 import pytest
 
+from tests.utils import override_settings
 from waterloo import configuration_factory
 from waterloo.refactor.annotations import annotate
-from waterloo.types import (
-    ImportCollisionPolicy,
-    UnpathedTypePolicy,
-)
-
-from tests.utils import override_settings
+from waterloo.types import ImportCollisionPolicy, UnpathedTypePolicy
 
 
-@pytest.mark.parametrize('allow_untyped_args', [
-    True,
-    False
-])
+@pytest.mark.parametrize("allow_untyped_args", [True, False])
 def test_allow_untyped_args(allow_untyped_args):
     content = '''
 def identity(arg1):
@@ -61,11 +54,7 @@ def identity(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -74,10 +63,7 @@ def identity(arg1):
     assert annotated == expected
 
 
-@pytest.mark.parametrize('allow_untyped_args', [
-    True,
-    False
-])
+@pytest.mark.parametrize("allow_untyped_args", [True, False])
 def test_allow_missing_args_section_single_arg(allow_untyped_args):
     content = '''
 def identity(arg1):
@@ -116,11 +102,7 @@ def identity(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -129,10 +111,7 @@ def identity(arg1):
     assert annotated == expected
 
 
-@pytest.mark.parametrize('allow_untyped_args', [
-    True,
-    False
-])
+@pytest.mark.parametrize("allow_untyped_args", [True, False])
 def test_allow_missing_args_section_multiple_args(allow_untyped_args):
     content = '''
 def identity(arg1, *args, **kwargs):
@@ -171,11 +150,7 @@ def identity(arg1, *args, **kwargs):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -184,10 +159,7 @@ def identity(arg1, *args, **kwargs):
     assert annotated == expected
 
 
-@pytest.mark.parametrize('allow_untyped_args', [
-    True,
-    False
-])
+@pytest.mark.parametrize("allow_untyped_args", [True, False])
 def test_allow_missing_args_section_no_args_func(allow_untyped_args):
     """
     If func has no args but 'Returns' is given then we should be
@@ -227,11 +199,7 @@ def identity():
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -241,26 +209,20 @@ def identity():
 
 
 @pytest.mark.parametrize(
-    'signature,arg_annotations',
+    "signature,arg_annotations",
     [
-        (
-            "arg1, arg2, arg3",
-            {"arg1": ("int", "blah"),
-             "arg2": ("str", "blah")},
-        ),
+        ("arg1, arg2, arg3", {"arg1": ("int", "blah"), "arg2": ("str", "blah")},),
         (
             "arg1, arg2",
-            {"arg1": ("int", "blah"),
-             "arg2": ("str", "blah"),
-             "arg3": ("bool", "blah")},
+            {
+                "arg1": ("int", "blah"),
+                "arg2": ("str", "blah"),
+                "arg3": ("bool", "blah"),
+            },
         ),
-        (
-            "arg1, arg2",
-            {"arg1": ("int", "blah"),
-             "arg3": ("str", "blah")},
-        ),
+        ("arg1, arg2", {"arg1": ("int", "blah"), "arg3": ("str", "blah")},),
     ],
-    ids=["missing arg", "extra arg", "name mismatch"]
+    ids=["missing arg", "extra arg", "name mismatch"],
 )
 def test_arg_annotation_signature_mismatch(signature, arg_annotations):
     annotations = "\n".join(
@@ -292,11 +254,7 @@ def identity({signature}):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -305,10 +263,7 @@ def identity({signature}):
     assert annotated == expected
 
 
-@pytest.mark.parametrize('require_return_type', [
-    True,
-    False
-])
+@pytest.mark.parametrize("require_return_type", [True, False])
 def test_require_return_type(require_return_type):
     content = '''
 def identity(arg1):
@@ -347,11 +302,7 @@ def identity(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -427,11 +378,7 @@ def outer(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -487,11 +434,7 @@ def decorated(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -592,11 +535,7 @@ def two(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -693,11 +632,7 @@ def two(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
@@ -801,11 +736,7 @@ def two(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:
