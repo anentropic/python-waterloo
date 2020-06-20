@@ -1,0 +1,6 @@
+[flake8]
+exclude = .svn,CVS,.bzr,.hg,.git,__pycache__,.tox,/VENV,tests/fixtures/*
+# black-compatible settings:
+select = C,E,F,W,B,B950
+max-line-length = 80
+extend-ignore = E501,W503,E203

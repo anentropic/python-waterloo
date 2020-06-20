@@ -1,14 +1,15 @@
 import re
 from collections import Counter, OrderedDict
+from typing import Dict
 
 import parsy
 import pytest
 from hypothesis import given, note, strategies as st
-from typing import Dict
 
+from tests.parsers import strategies
 from waterloo.parsers.napoleon import (
-    args_head,
     arg_type,
+    args_head,
     docstring_parser,
     dotted_var_path,
     ignored_line,
@@ -16,17 +17,11 @@ from waterloo.parsers.napoleon import (
     p_returns_block,
     rest_of_line,
     returns_head,
-    var_name,
     type_atom,
+    var_name,
 )
 from waterloo.refactor.utils import slice_by_pos
-from waterloo.types import (
-    ArgsSection,
-    TypeAtom,
-    VALID_RETURNS_SECTION_NAMES,
-)
-
-from tests.parsers import strategies
+from waterloo.types import VALID_RETURNS_SECTION_NAMES, ArgsSection, TypeAtom
 
 
 """
@@ -44,10 +39,12 @@ def test_valid_args_head(example):
     assert result == "Args"  # (Section name has been normalised)
 
 
-@given(st.one_of(
-    strategies.invalid_args_head_bad_name_f(),
-    strategies.invalid_args_head_bad_template_f(),
-))
+@given(
+    st.one_of(
+        strategies.invalid_args_head_bad_name_f(),
+        strategies.invalid_args_head_bad_template_f(),
+    )
+)
 def test_invalid_args_head(example):
     with pytest.raises(parsy.ParseError):
         args_head.parse(example)
@@ -61,22 +58,24 @@ def test_valid_returns_head(example):
     assert result == normalised  # (Section name has been normalised)
 
 
-@given(st.one_of(
-    strategies.invalid_returns_head_bad_name_f(),
-    strategies.invalid_returns_head_bad_template_f(),
-))
+@given(
+    st.one_of(
+        strategies.invalid_returns_head_bad_name_f(),
+        strategies.invalid_returns_head_bad_template_f(),
+    )
+)
 def test_invalid_returns_head(example):
     with pytest.raises(parsy.ParseError):
         returns_head.parse(example)
 
 
 @given(
-    splat=st.text('*', min_size=0, max_size=4),
+    splat=st.text("*", min_size=0, max_size=4),
     name=strategies.strip_whitespace_f(
         blacklist_characters="\n\r*", min_size=0, max_size=10
     ),
     trailing_ws=strategies.whitespace_f(),
-    newline=st.one_of(st.just(''), st.just('\n')),
+    newline=st.one_of(st.just(""), st.just("\n")),
 )
 def test_var_name(splat, name, trailing_ws, newline):
     """
@@ -97,7 +96,7 @@ def test_var_name(splat, name, trailing_ws, newline):
 @given(
     segments=strategies.small_lists_nonempty_f(st.text(min_size=0, max_size=8)),
     trailing_ws=strategies.whitespace_f(),
-    newline=st.one_of(st.just(''), st.just('\n')),
+    newline=st.one_of(st.just(""), st.just("\n")),
 )
 def test_dotted_var_path(segments, trailing_ws, newline):
     """
@@ -111,7 +110,7 @@ def test_dotted_var_path(segments, trailing_ws, newline):
     if segments:
         segments[-1] = segments[-1].rstrip()
 
-    path = '.'.join(segments)
+    path = ".".join(segments)
     example = f"{path}{trailing_ws}{newline}"
     if all(seg.isidentifier() for seg in segments) and not newline:
         result = dotted_var_path.parse(example)
@@ -126,8 +125,8 @@ def _add_normalised_whitespace(segment):
     Assuming `segment` has already been stirpped, re-add normalised
     whitespace ready for joining the segments into a TypeAtom str
     """
-    if segment.startswith(','):
-        return f'{segment} '
+    if segment.startswith(","):
+        return f"{segment} "
     else:
         return segment
 
@@ -137,9 +136,9 @@ def _normalise_annotation(annotation):
     Take a dirty annotation and strip spurious newlines and whitespace so that
     it should match the output from an equivalent TypeAtom.to_annotation(None)
     """
-    return ''.join(
+    return "".join(
         _add_normalised_whitespace(segment.strip())
-        for segment in re.split(r'([\[\]\,])', annotation)
+        for segment in re.split(r"([\[\]\,])", annotation)
     )
 
 
@@ -167,19 +166,16 @@ def test_arg_type_annotated(annotated_arg_example):
     example, context = annotated_arg_example
     parser = arg_type << rest_of_line
     result = parser.parse(example)
-    assert result['arg'] == context['arg_name']
-    assert_annotation_roundtrip(context['type_annotation'], result['type'])
+    assert result["arg"] == context["arg_name"]
+    assert_annotation_roundtrip(context["type_annotation"], result["type"])
 
-    start, _, end = result['type']
-    assert slice_by_pos(example, start, end) == context['type_annotation']
+    start, _, end = result["type"]
+    assert slice_by_pos(example, start, end) == context["type_annotation"]
 
 
 @given(
     arg_name=strategies.arg_name_f(),
-    trailer=st.one_of(
-        st.just(''),
-        strategies.arg_description_start_f(),
-    )
+    trailer=st.one_of(st.just(""), strategies.arg_description_start_f(),),
 )
 def test_arg_type_no_annotation(arg_name, trailer):
     """
@@ -189,12 +185,11 @@ def test_arg_type_no_annotation(arg_name, trailer):
     example = f"{arg_name}{trailer}"
     parser = arg_type << rest_of_line
     result = parser.parse(example)
-    assert result['arg'] == arg_name
+    assert result["arg"] == arg_name
 
 
 @given(
-    indent=strategies.whitespace_f(),
-    line_to_ignore=strategies.ignored_line,
+    indent=strategies.whitespace_f(), line_to_ignore=strategies.ignored_line,
 )
 def test_ignored_line(indent, line_to_ignore):
     """
@@ -209,13 +204,11 @@ def test_ignored_line(indent, line_to_ignore):
 
 @given(
     indent=strategies.whitespace_f(),
-    blank_lines=st.text('\n', min_size=0, max_size=2),
+    blank_lines=st.text("\n", min_size=0, max_size=2),
     ignored_lines=strategies.small_lists_f(strategies.ignored_line),
 )
 def test_ignored_lines(
-    indent,
-    blank_lines,
-    ignored_lines,
+    indent, blank_lines, ignored_lines,
 ):
     intro = "\n".join(f"{indent}{line}" for line in ignored_lines)
     to_be_consumed = f"{intro}\n{blank_lines}"
@@ -235,8 +228,8 @@ def _validate_args_section(example, result, context):
     assert result.name == ArgsSection.ARGS
 
     expected_arg_type_map: Dict[str, str] = OrderedDict(
-        (ex_arg.context['arg_name'], ex_arg.context['type_annotation'])
-        for ex_arg in context['annotated_args']
+        (ex_arg.context["arg_name"], ex_arg.context["type_annotation"])
+        for ex_arg in context["annotated_args"]
     )
     assert expected_arg_type_map.keys() == result.args.keys()
 
@@ -259,7 +252,7 @@ def _validate_returns_section(example, result, context):
     assert result.name in VALID_RETURNS_SECTION_NAMES
     assert result.name == VALID_RETURNS_SECTION_NAMES[result.name][1]
 
-    type_annotation_str = context['annotated_return'].context['type_annotation']
+    type_annotation_str = context["annotated_return"].context["type_annotation"]
     assert_annotation_roundtrip(type_annotation_str, result.type_def)
 
     start, _, end = result.type_def
@@ -280,18 +273,14 @@ def test_docstring_parser(docstring):
 
     result = docstring_parser.parse(example)
 
-    if context['args_section'][0]:
+    if context["args_section"][0]:
         note(f"args_section: {context['args_section'][0]}")
         _validate_args_section(
-            example,
-            result.arg_types,
-            context['args_section'].context,
+            example, result.arg_types, context["args_section"].context,
         )
 
-    if context['returns_section'][0]:
+    if context["returns_section"][0]:
         note(f"returns_section: {context['returns_section'][0]}")
         _validate_returns_section(
-            example,
-            result.return_type,
-            context['returns_section'].context,
+            example, result.return_type, context["returns_section"].context,
         )

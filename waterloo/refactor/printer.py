@@ -6,18 +6,18 @@ import parsy
 from fissix.pytree import Leaf
 
 from waterloo.types import (
+    PRINTABLE_SETTINGS,
     AmbiguousTypeError,
     ImportCollisionPolicy,
     ModuleHasStarImportError,
     NameMatchesLocalClassError,
     NameMatchesRelativeImportError,
     NotFoundNoPathError,
-    PRINTABLE_SETTINGS,
     UnpathedTypePolicy,
 )
 
 
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def report_settings(settings, echo):
     for key in sorted(PRINTABLE_SETTINGS):
         try:
@@ -33,16 +33,19 @@ def report_settings(settings, echo):
     echo.debug("")
 
 
-@inject.params(echo='echo')
+@inject.params(echo="echo")
 def report_parse_error(e: parsy.ParseError, function: Leaf, echo):
+    # fmt: off
     echo.error(
         f"🛑 <b>line {function.lineno}:</b> Error parsing docstring for <b>def {function.value}</b>\n"
         f"   {e!r}"
     )
+    # fmt: on
 
 
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def report_doc_args_signature_mismatch_error(function: Leaf, settings, echo):
+    # fmt: off
     msg = (
         f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> has arg names which are "
         f"inconsistent with the function signature."
@@ -51,10 +54,12 @@ def report_doc_args_signature_mismatch_error(function: Leaf, settings, echo):
         f"🛑 {msg}\n"
         f"   ➤ no type annotation added"
     )
+    # fmt: on
 
 
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def report_incomplete_arg_types(function: Leaf, settings, echo):
+    # fmt: off
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types."
     if not settings.ALLOW_UNTYPED_ARGS:
         echo.error(
@@ -66,10 +71,12 @@ def report_incomplete_arg_types(function: Leaf, settings, echo):
             f"⚠️  {msg}\n"
             f"   ➤ args will be annotated as <b>(...)</b>"
         )
+    # fmt: on
 
 
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def report_incomplete_return_type(function: Leaf, settings, echo):
+    # fmt: off
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not specify a return type."
     if settings.REQUIRE_RETURN_TYPE:
         echo.error(
@@ -81,28 +88,28 @@ def report_incomplete_return_type(function: Leaf, settings, echo):
             f"⚠️  {msg}\n"
             f"   ➤ return will be annotated as <b>-> None</b>"
         )
+    # fmt: on
 
 
 @singledispatch
 def report_ambiguous_type_error(
-    e: AmbiguousTypeError,
-    function: Leaf,
+    e: AmbiguousTypeError, function: Leaf,
 ):
+    # fmt: off
     raise TypeError(
         f"Unexpected AmbiguousTypeError: {e!r}"
     )
+    # fmt: on
 
 
 @report_ambiguous_type_error.register
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def _(
-    e: ModuleHasStarImportError,
-    function: Leaf,
-    settings,
-    echo,
+    e: ModuleHasStarImportError, function: Leaf, settings, echo,
 ):
     t_module, t_name = e.args
     assert t_module
+    # fmt: off
     msg = (
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{t_module}.{t_name}</b> in docstring for <b>def {function.value}</b> "
         f"matches \"from {t_module} import *\" but we don't know if \"{t_name}\" is in *."
@@ -124,18 +131,17 @@ def _(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
             f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
         )
+    # fmt: on
 
 
 @report_ambiguous_type_error.register
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def _(
-    e: NameMatchesLocalClassError,
-    function: Leaf,
-    settings,
-    echo,
+    e: NameMatchesLocalClassError, function: Leaf, settings, echo,
 ):
     t_module, t_name = e.args
     type_path = f"{t_module}.{t_name}" if t_module else t_name
+    # fmt: off
     msg = (
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{type_path}</b> in docstring for <b>def {function.value}</b> "
         f"matches a \"class {t_name}\" also defined in the module, but we don't know if it is the same."
@@ -157,18 +163,17 @@ def _(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
             f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
         )
+    # fmt: on
 
 
 @report_ambiguous_type_error.register
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def _(
-    e: NameMatchesRelativeImportError,
-    function: Leaf,
-    settings,
-    echo,
+    e: NameMatchesRelativeImportError, function: Leaf, settings, echo,
 ):
     t_module, t_name = e.args
     type_path = f"{t_module}.{t_name}" if t_module else t_name
+    # fmt: off
     msg = (
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{type_path}</b> in docstring for <b>def {function.value}</b> "
         f"matches a \"{t_name}\" imported from a relative path, but we don't know if it is the same."
@@ -190,17 +195,16 @@ def _(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
             f"IMPORT_COLLISION_POLICY={settings.IMPORT_COLLISION_POLICY.name}"
         )
+    # fmt: on
 
 
 @report_ambiguous_type_error.register
-@inject.params(settings='settings', echo='echo')
+@inject.params(settings="settings", echo="echo")
 def _(
-    e: NotFoundNoPathError,
-    function: Leaf,
-    settings,
-    echo,
+    e: NotFoundNoPathError, function: Leaf, settings, echo,
 ):
     _, t_name = e.args
+    # fmt: off
     msg = (
         f"<b>line {function.lineno}:</b> Ambiguous Type: <b>{t_name}</b> in docstring for <b>def {function.value}</b> "
         f"does not match any builtins, typing.&lt;Type&gt;, imported names or class def in the file, and does not provide "
@@ -223,3 +227,4 @@ def _(
             f"Unexpected fall-thru for {e.__class__.__name__} and "
             f"UNPATHED_TYPE_POLICY={settings.UNPATHED_TYPE_POLICY.name}"
         )
+    # fmt: on

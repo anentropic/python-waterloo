@@ -4,15 +4,6 @@ from typing import Dict, Tuple
 import inject
 from hypothesis import given, note, strategies as st
 
-from waterloo import configuration_factory
-from waterloo.parsers.napoleon import type_atom
-from waterloo.refactor.annotations import annotate
-from waterloo.types import (
-    ImportCollisionPolicy,
-    ImportStrategy,
-    UnpathedTypePolicy,
-)
-
 from tests.refactor import strategies
 from tests.refactor.types import (
     Ambiguity,
@@ -25,6 +16,10 @@ from tests.refactor.types import (
     TypeDef,
     TypeSrc,
 )
+from waterloo import configuration_factory
+from waterloo.parsers.napoleon import type_atom
+from waterloo.refactor.annotations import annotate
+from waterloo.types import ImportCollisionPolicy, ImportStrategy, UnpathedTypePolicy
 
 
 """
@@ -70,7 +65,7 @@ Cases to test:
     unpathed_type_policy=st.sampled_from(UnpathedTypePolicy),
     type_and_imports=strategies.type_and_imports_f(),
 )
-@inject.params(settings='settings')
+@inject.params(settings="settings")
 def test_fully_typed(
     import_collision_policy: ImportCollisionPolicy,
     unpathed_type_policy: UnpathedTypePolicy,
@@ -146,9 +141,7 @@ def test_fully_typed(
     note(f"expected_import_strategy: {expected_import_strategy}")
 
     import_lines = "\n".join(
-        i.import_statement
-        for i in imports.values()
-        if not isinstance(i, NoImport)
+        i.import_statement for i in imports.values() if not isinstance(i, NoImport)
     )
 
     class_defs = "\n\n\n".join(
@@ -170,11 +163,7 @@ def identity(arg1):
     return arg1
 '''
 
-    content = "\n\n".join(
-        var
-        for var in (import_lines, class_defs, funcdef)
-        if var
-    )
+    content = "\n\n".join(var for var in (import_lines, class_defs, funcdef) if var)
     note(content)
 
     NO_ADD_STRATEGIES = {
@@ -220,11 +209,7 @@ def identity(arg1):
         else:
             import_lines = added_imports
 
-    expected = "\n\n".join(
-        var
-        for var in (import_lines, class_defs, funcdef)
-        if var
-    )
+    expected = "\n\n".join(var for var in (import_lines, class_defs, funcdef) if var)
     note(expected)
 
     with tempfile.NamedTemporaryFile(suffix=".py") as f:
@@ -240,11 +225,7 @@ def identity(arg1):
         inject.clear_and_configure(configuration_factory(test_settings))
 
         annotate(
-            f.name,
-            in_process=True,
-            interactive=False,
-            write=True,
-            silent=True,
+            f.name, in_process=True, interactive=False, write=True, silent=True,
         )
 
         with open(f.name, "r") as fr:

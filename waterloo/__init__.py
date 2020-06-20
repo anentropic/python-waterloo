@@ -6,14 +6,15 @@ from waterloo.utils import StylePrinter
 
 def configuration_factory(settings):
     def configure(binder):
-        binder.bind('settings', settings)
+        binder.bind("settings", settings)
         binder.bind(
-            'echo',
+            "echo",
             StylePrinter(
-                style=getattr(settings, 'ECHO_STYLES', None),
+                style=getattr(settings, "ECHO_STYLES", None),
                 log_level=settings.LOG_LEVEL,
-            )
+            ),
         )
+
     return configure
 
 

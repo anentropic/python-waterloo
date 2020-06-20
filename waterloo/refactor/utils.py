@@ -4,22 +4,12 @@ import typing
 from collections import OrderedDict
 from enum import Enum, auto
 from itertools import chain
-from typing import (
-    cast,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Callable, Dict, Generator, List, Optional, Set, Tuple, Union, cast
 
 import inject
 import parso
-from fissix.pytree import Leaf, Node
 from fissix.pygram import python_symbols
+from fissix.pytree import Leaf, Node
 
 from waterloo.types import (
     ImportCollisionPolicy,
@@ -58,9 +48,7 @@ def get_type_comment(
         # to avoid reaching this case, configure ALLOW_UNTYPED_ARGS=False
         args = Types.ELLIPSIS
     if signature.return_type and signature.return_type.type_def:
-        returns = signature.return_type.type_def.to_annotation(
-            name_to_strategy
-        )
+        returns = signature.return_type.type_def.to_annotation(name_to_strategy)
     else:
         # to avoid reaching this case, configure REQUIRE_RETURN_TYPE=True
         returns = Types.NONE
@@ -82,7 +70,7 @@ TYPING_TYPE_NAMES = {
             typing._GenericAlias,  # type: ignore[attr-defined,arg-type]
             typing._SpecialForm,  # type: ignore
             typing.TypeVar,  # type: ignore
-        )
+        ),
     )
 }
 
@@ -96,13 +84,13 @@ def _is_typing_type(name: str) -> bool:
 
 
 def _is_dotted_path(name: str) -> bool:
-    return '.' in name and name != Types.ELLIPSIS
+    return "." in name and name != Types.ELLIPSIS
 
 
 def walk_tree(
-    node: parso.tree.NodeOrLeaf
+    node: parso.tree.NodeOrLeaf,
 ) -> Generator[parso.tree.NodeOrLeaf, None, None]:
-    if hasattr(node, 'children'):
+    if hasattr(node, "children"):
         yield node
         for child in node.children:
             for subchild in walk_tree(child):
@@ -147,7 +135,7 @@ def args_annotations_match_signature(
     return arg_annotations.keys() == signature_args
 
 
-@inject.params(settings='settings')
+@inject.params(settings="settings")
 def find_local_types(filename: str, settings) -> LocalTypes:
     """
     TODO: parso understands scopes so we could feasibly
@@ -175,9 +163,7 @@ def find_local_types(filename: str, settings) -> LocalTypes:
                     names_to_packages[name.value] = f"{prefix}{package}"
         elif isinstance(node, parso.python.tree.ImportName):
             paths = node.get_paths()[0]
-            package_imports.add(
-                ".".join(path.value for path in paths)
-            )
+            package_imports.add(".".join(path.value for path in paths))
     return LocalTypes.factory(
         class_defs=class_defs,
         star_imports=star_imports,
@@ -186,15 +172,15 @@ def find_local_types(filename: str, settings) -> LocalTypes:
     )
 
 
-@inject.params(settings='settings')
+@inject.params(settings="settings")
 def strategy_for_name_factory(
-    local_types: LocalTypes,
-    settings,
+    local_types: LocalTypes, settings,
 ) -> Callable[[str], ImportStrategy]:
     """
     Args:
         local_types: names from imports or local ClassDefs
     """
+
     def _strategy_for_name(name: str) -> ImportStrategy:
         """
         We use the following heuristic to determine behaviour for auto-adding
@@ -310,11 +296,10 @@ def get_import_lines(
         if _is_typing_type(name):
             return ("typing", name)
         else:
-            return cast(Tuple[str, str], tuple(name.rsplit('.', maxsplit=1)))
+            return cast(Tuple[str, str], tuple(name.rsplit(".", maxsplit=1)))
 
     import_tuples.extend(
-        from_import(name)
-        for name in strategies.get(ImportStrategy.ADD_FROM, set())
+        from_import(name) for name in strategies.get(ImportStrategy.ADD_FROM, set())
     )
 
     import_tuples.extend(
@@ -337,16 +322,14 @@ def slice_by_pos(val: str, start: SourcePos, end: SourcePos) -> str:
     if "\n" in val:
         lines = val.split("\n")
         if end.row > start.row:
-            top = lines[start.row][start.col:]
-            filling = lines[start.row + 1: end.row]
-            bottom = lines[end.row][:end.col]
-            return "\n".join(
-                line for line in chain([top], filling, [bottom])
-            )
+            top = lines[start.row][start.col :]
+            filling = lines[start.row + 1 : end.row]
+            bottom = lines[end.row][: end.col]
+            return "\n".join(line for line in chain([top], filling, [bottom]))
         else:
-            return lines[start.row][start.col:end.col]
+            return lines[start.row][start.col : end.col]
     else:
-        return val[start.col:end.col]
+        return val[start.col : end.col]
 
 
 class TypeDefRole(Enum):
@@ -364,7 +347,7 @@ def _remove_type_def(
 
     start_pos = type_def.start_pos + offset
     start_line = lines[start_pos.row]
-    prefix = start_line[:start_pos.col - expand]
+    prefix = start_line[: start_pos.col - expand]
     if role is TypeDefRole.ARG:
         # remove preceding whitespace after arg name before open paren
         prefix = prefix.rstrip()
@@ -384,11 +367,12 @@ def _remove_type_def(
 
     def has_return_description():
         # TODO: this would be easier if the parser captured a full AST...
-        return (
-            replaced_line.strip()
-            or (lines[_post:]
-                and lines[_post].startswith(prefix)  # is indented (else not part of returns section)
-                and lines[_post].strip())
+        return replaced_line.strip() or (
+            lines[_post:]
+            and lines[_post].startswith(
+                prefix
+            )  # is indented (else not part of returns section)
+            and lines[_post].strip()
         )
 
     if role is TypeDefRole.RETURN:
@@ -408,10 +392,7 @@ def _remove_type_def(
     else:
         segments = [lines[:_pre], [replaced_line], lines[_post:]]
 
-    return [
-        line
-        for line in chain.from_iterable(segments)
-    ]
+    return [line for line in chain.from_iterable(segments)]
 
 
 def remove_types(docstring: str, signature: TypeSignature) -> str:
@@ -426,10 +407,7 @@ def remove_types(docstring: str, signature: TypeSignature) -> str:
         for type_def in signature.arg_types.args.values():
             if type_def is not None:
                 lines = _remove_type_def(
-                    lines=lines,
-                    type_def=type_def,
-                    offset=offset,
-                    role=TypeDefRole.ARG,
+                    lines=lines, type_def=type_def, offset=offset, role=TypeDefRole.ARG,
                 )
                 line_count = len(lines)
                 offset = SourcePos(line_count - original_line_count, 0)
