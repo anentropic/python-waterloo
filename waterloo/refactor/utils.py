@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from collections import OrderedDict
 from enum import Enum, auto
 from itertools import chain
 from typing import Callable, Dict, Generator, List, Optional, Set, Tuple, Union, cast
@@ -128,10 +127,7 @@ def _flatten_signature(elements: List[Union[Node, Leaf]]) -> Generator[str, None
             continue
 
 
-def args_annotations_match_signature(
-    arg_annotations: OrderedDict[str, Optional[TypeDef]],
-    signature: List[Union[Node, Leaf]],
-) -> bool:
+def arg_names_from_signature(signature: List[Union[Node, Leaf]]) -> Set[str]:
     """
     Compare the argument names we have parsed from the docstring annotations
     with those found in the function signature.
@@ -157,7 +153,8 @@ def args_annotations_match_signature(
         else:
             raise UnexpectedNodeType(element)
 
-    return arg_annotations.keys() == signature_args
+    signature_args -= {"self", "cls"}
+    return signature_args
 
 
 @inject.params(settings="settings")

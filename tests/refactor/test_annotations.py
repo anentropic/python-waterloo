@@ -221,12 +221,16 @@ def identity():
             "arg1, *, arg2 = 'default'",
             {"arg1": ("int", "blah"), "arg2": ("str", "blah")},
         ),
+        ("self, arg1", {"arg1": ("int", "blah")},),
+        ("cls, arg1", {"arg1": ("int", "blah")},),
     ],
     ids=[
         "arg with default value",
         "arg with default value containing comma",
         "arg with statement as default value",
         "signature with keyword-only args",
+        "method signature",
+        "class-method signature",
     ],
 )
 def test_arg_annotation_signature_validate(signature, arg_annotations):
