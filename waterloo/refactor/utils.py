@@ -1,10 +1,25 @@
+from __future__ import annotations
+
 import typing
+from collections import OrderedDict
 from enum import Enum, auto
 from itertools import chain
-from typing import cast, Callable, Dict, Generator, List, Optional, Set, Tuple
+from typing import (
+    cast,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import inject
 import parso
+from fissix.pytree import Leaf, Node
+from fissix.pygram import python_symbols
 
 from waterloo.types import (
     ImportCollisionPolicy,
@@ -96,6 +111,42 @@ def walk_tree(
         yield node
 
 
+class UnexpectedNodeType(Exception):
+    pass
+
+
+def args_annotations_match_signature(
+    arg_annotations: OrderedDict[str, Optional[TypeDef]],
+    signature: List[Union[Node, Leaf]],
+) -> bool:
+    """
+    Compare the argument names we have parsed from the docstring annotations
+    with those found in the function signature.
+    """
+    # we have either an empty list or a list with one element
+    # if there's only one arg the element is a `Leaf`, else it is a
+    # `Node(typedargslist, List[Leaf])`
+    if signature:
+        element = signature[0]
+
+    if not signature:
+        # no args
+        signature_args = set()
+    elif not isinstance(element, Leaf):
+        # multiple args
+        if element.type == python_symbols.typedargslist:
+            signature_args = set(
+                "".join(leaf.value for leaf in element.children).split(",")
+            )
+        else:
+            raise UnexpectedNodeType(element)
+    else:
+        # one arg
+        signature_args = {element.value}
+
+    return arg_annotations.keys() == signature_args
+
+
 @inject.params(settings='settings')
 def find_local_types(filename: str, settings) -> LocalTypes:
     """
@@ -149,14 +200,17 @@ def strategy_for_name_factory(
         We use the following heuristic to determine behaviour for auto-adding
         import statements where possible:
 
-        1. primary decision table
+        1. primary decision table:
                           | bare      | dotted path
+        ------------------ ----------- ---------------------------------
         not found         | warn/fail | add import
         in locals         | use local | ? --> see 2. below
         module name found | N/A       | warn*/fail/from-style-import **
           in a * import   |           |
 
         2. decision table if dotted-path + type-name in locals:
+        case                    | decision
+        ------------------------ ---------------------------------------
         looks same path         | use existing
         looks different path    | import as dotted
         can't tell (e.g. locals | warn*/fail/import-as-dotted **

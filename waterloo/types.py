@@ -195,7 +195,7 @@ class ArgTypes:
     ) -> 'ArgTypes':
         """
         We need all args to have a type, otherwise we can't output a valid
-        py2 type comment.
+        py2 type comment. This is indicated by `is_fully_typed`.
         """
         is_fully_typed = all(
             arg is not None for arg in args.values()
@@ -204,6 +204,17 @@ class ArgTypes:
             name=name,
             args=args,
             is_fully_typed=is_fully_typed,
+        )
+
+    @classmethod
+    def no_args_factory(cls) -> 'ArgTypes':
+        """
+        For a function with no args in its real signature.
+        """
+        return cls(
+            name=ArgsSection.ARGS,
+            args={},
+            is_fully_typed=True,
         )
 
     def type_names(self) -> Set[str]:
@@ -227,7 +238,7 @@ class ReturnType:
     ) -> 'ReturnType':
         """
         (I'm not sure our parser would ever return a `ReturnType` with no
-        `type_atom` so this is likely always `True`)
+        `type_atom` so `is_fully_typed` is likely always `True`)
         """
         is_fully_typed = type_def is not None
         return cls(

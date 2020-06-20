@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import Dict, NamedTuple, Optional, Tuple, Union
+from typing import Dict, NamedTuple, Tuple, Union
 from typing_extensions import Final
 
 

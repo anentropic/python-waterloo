@@ -42,6 +42,18 @@ def report_parse_error(e: parsy.ParseError, function: Leaf, echo):
 
 
 @inject.params(settings='settings', echo='echo')
+def report_doc_args_signature_mismatch_error(function: Leaf, settings, echo):
+    msg = (
+        f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> has arg names which are "
+        f"inconsistent with the function signature."
+    )
+    echo.error(
+        f"🛑 {msg}\n"
+        f"   ➤ no type annotation added"
+    )
+
+
+@inject.params(settings='settings', echo='echo')
 def report_incomplete_arg_types(function: Leaf, settings, echo):
     msg = f"<b>line {function.lineno}:</b> Docstring for <b>def {function.value}</b> did not fully specify arg types."
     if not settings.ALLOW_UNTYPED_ARGS:

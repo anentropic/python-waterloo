@@ -12,10 +12,10 @@ from waterloo.types import ImportCollisionPolicy, UnpathedTypePolicy
 def main(settings):
     parser = argparse.ArgumentParser(
         description=(
-            f"Convert the type annotations in 'Google-style' docstrings (as"
-            f" understood by e.g. Sphinx's Napoleon docs plugin) "
-            f" into PEP-484 type comments which can be checked statically"
-            f" using `mypy --py2`"
+            "Convert the type annotations in 'Google-style' docstrings (as"
+            " understood by e.g. Sphinx's Napoleon docs plugin) "
+            " into PEP-484 type comments which can be checked statically"
+            " using `mypy --py2`"
         ),
     )
 

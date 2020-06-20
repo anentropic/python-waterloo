@@ -350,6 +350,7 @@ def test_docstring_parser():
             retry_interval (Optional[float]): how long to wait between polling
                 for tokens to be available. `None` means use default interval
                 which is equal to time needed to replenish `num_tokens`.
+            **kwargs (Any)
 
         Returns:
             bool: whether we got the requested tokens or not
@@ -383,14 +384,20 @@ def test_docstring_parser():
                     ('Optional', [TypeAtom('float', [])]),
                     (8, 43),
                  )),
+                ('**kwargs',
+                 TypeDef.from_tuples(
+                    (11, 22),
+                    ('Any', []),
+                    (11, 25),
+                 )),
             ]),
         ),
         return_type=ReturnType.factory(
             name=ReturnsSection.RETURNS,
             type_def=TypeDef.from_tuples(
-                (13, 12),
+                (14, 12),
                 ('bool', []),
-                (13, 16),
+                (14, 16),
             ),
         )
     )
