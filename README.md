@@ -80,6 +80,7 @@ positional arguments:
 | `-i, --interactive` | Whether to prompt about applying each diff hunk. (default: `False`) |
 | `-q, --quiet` | Quiet mode will output only warnings and errors. (default: `False`) |
 | `-d, --debug` | Debug mode will also output info and debug messages. (default: `False`) |
+| `-ll {DEBUG,INFO,WARNING,ERROR}, --log-level {DEBUG,INFO,WARNING,ERROR}` | Set the logging level. (default: `INFO`) |
 
 **waterloo.toml**
 

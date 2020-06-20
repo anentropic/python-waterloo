@@ -127,27 +127,12 @@ def main(settings):
         default=False,
         help="Whether to prompt about applying each diff hunk.",
     )
-
-    # NOTE:
-    # this is not the `quiet/debug` flag from `bowler`... our own logging is
-    # not subject to the bowler flag and our default level is INFO, so we have
-    # *two* mutually-exclusive flags - the `debug` flag applies to Bowler but
-    # also sets our log level to DEBUG, meanwhile the `quiet` flag has no
-    # effect on Bowler but sets our log level to WARNING.
-    log_level_group = apply_group.add_mutually_exclusive_group()
-    log_level_group.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        default=False,
-        help="Quiet mode will output only warnings and errors.",
-    )
-    log_level_group.add_argument(
-        "-d",
-        "--debug",
-        action="store_true",
-        default=False,
-        help="Debug mode will also output info and debug messages.",
+    apply_group.add_argument(
+        "-ll",
+        "--log-level",
+        default=settings.LOG_LEVEL.name,
+        choices=[m.name for m in LogLevel],
+        help="Set the logging level.",
     )
 
     args = parser.parse_args()
@@ -161,10 +146,7 @@ def main(settings):
         settings.REQUIRE_RETURN_TYPE = args.require_return_type
         settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
         settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
-        if args.debug:
-            settings.LOG_LEVEL = LogLevel.DEBUG
-        elif args.quiet:
-            settings.LOG_LEVEL = LogLevel.WARNING
+        settings.LOG_LEVEL = args.log_level
 
         inject.clear_and_configure(configuration_factory(settings))
 
