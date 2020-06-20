@@ -22,7 +22,7 @@ For this reason it is best installed using [pipx](https://github.com/pipxproject
 
 ```
 $ pipx install waterloo
-  installed package waterloo 0.5.0, Python 3.7.6
+  installed package waterloo 0.6.0, Python 3.7.7
   These apps are now globally available
     - waterloo
 done! ✨ 🌟 ✨
@@ -78,6 +78,8 @@ positional arguments:
 | `-w, --write` | Whether to apply the changes to target files. Without this flag set waterloo will just perform a 'dry run'. (default: `False`) |
 | `-s, --show-diff` | Whether to print the hunk diffs to be applied. (default: `False`) |
 | `-i, --interactive` | Whether to prompt about applying each diff hunk. (default: `False`) |
+| `-q, --quiet` | Quiet mode will output only warnings and errors. (default: `False`) |
+| `-d, --debug` | Debug mode will also output info and debug messages. (default: `False`) |
 
 **waterloo.toml**
 
