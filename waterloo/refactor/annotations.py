@@ -22,7 +22,7 @@ from waterloo.refactor.printer import (
     report_settings,
 )
 from waterloo.refactor.utils import (
-    args_annotations_match_signature,
+    arg_names_from_signature,
     find_local_types,
     get_import_lines,
     get_type_comment,
@@ -129,13 +129,12 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     if not doc_annotation.has_types:
         raise Interrupt
 
-    signatures_match = args_annotations_match_signature(
-        arg_annotations=doc_annotation.arg_types.args
-        if doc_annotation.arg_types
-        else {},
-        signature=signature,
+    annotation_arg_names = (
+        doc_annotation.arg_types.args.keys() if doc_annotation.arg_types else set()
     )
-    if doc_annotation.arg_types and not signatures_match:
+    signature_arg_names = arg_names_from_signature(signature)
+
+    if doc_annotation.arg_types and not annotation_arg_names == signature_arg_names:
         report_doc_args_signature_mismatch_error(function)
         raise Interrupt
     # we either have no annotation args, or we do and the names match the signature
@@ -143,13 +142,13 @@ def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
     # are we okay to annotate?
     # TODO these are currently WARN/FAIL... maybe should be OK/WARN/FAIL
     # configurably, like for amibiguous types
-    if signature and (
+    if signature_arg_names and (
         not doc_annotation.arg_types or not doc_annotation.arg_types.is_fully_typed
     ):
         report_incomplete_arg_types(function)
         if not threadlocals.settings.ALLOW_UNTYPED_ARGS:
             raise Interrupt
-    elif not signature and not doc_annotation.arg_types:
+    elif not signature_arg_names and not doc_annotation.arg_types:
         # special case: replace doc_annotation with one having empty args
         # (rather than `None`)
         doc_annotation = TypeSignature.factory(

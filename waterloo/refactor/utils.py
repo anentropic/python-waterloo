@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from collections import OrderedDict
 from enum import Enum, auto
 from itertools import chain
 from typing import Callable, Dict, Generator, List, Optional, Set, Tuple, Union, cast
@@ -103,36 +102,59 @@ class UnexpectedNodeType(Exception):
     pass
 
 
-def args_annotations_match_signature(
-    arg_annotations: OrderedDict[str, Optional[TypeDef]],
-    signature: List[Union[Node, Leaf]],
-) -> bool:
+def _flatten_signature(elements: List[Union[Node, Leaf]]) -> Generator[str, None, None]:
+    """
+    Extract arg names from parse tree of function arguments
+    """
+    name_context = True
+    for element in elements:
+        if isinstance(element, Leaf):
+            if element.value == "=":
+                name_context = False
+                continue
+            if element.value == ",":
+                name_context = True
+                continue
+            if element.value == "*":
+                # signature with keyword-only args
+                continue
+            if name_context:
+                yield element.value
+                continue
+        else:
+            # it's a Node, assume we're in value-context and discard
+            assert not name_context
+            continue
+
+
+def arg_names_from_signature(signature: List[Union[Node, Leaf]]) -> Set[str]:
     """
     Compare the argument names we have parsed from the docstring annotations
     with those found in the function signature.
     """
     # we have either an empty list or a list with one element
-    # if there's only one arg the element is a `Leaf`, else it is a
-    # `Node(typedargslist, List[Leaf])`
     if signature:
         element = signature[0]
 
+    # if there are several args the element is a `Node(typedargslist, List[Leaf])`
+    # each arg is either a `Leaf` if it's just a bare arg name
+    # else the arg and default value assignment are a `Node(term, List[Leaf])`
+    # if there's a single arg which is a bare arg name then element is a `Leaf`
     if not signature:
         # no args
         signature_args = set()
-    elif not isinstance(element, Leaf):
+    elif isinstance(element, Leaf):
+        # one bare arg (no value assignment)
+        signature_args = {element.value}
+    else:
         # multiple args
         if element.type == python_symbols.typedargslist:
-            signature_args = set(
-                "".join(leaf.value for leaf in element.children).split(",")
-            )
+            signature_args = set(_flatten_signature(element.children))
         else:
             raise UnexpectedNodeType(element)
-    else:
-        # one arg
-        signature_args = {element.value}
 
-    return arg_annotations.keys() == signature_args
+    signature_args -= {"self", "cls"}
+    return signature_args
 
 
 @inject.params(settings="settings")
