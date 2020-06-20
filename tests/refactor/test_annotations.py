@@ -211,6 +211,81 @@ def identity():
 @pytest.mark.parametrize(
     "signature,arg_annotations",
     [
+        ("arg1, arg2 = 'default'", {"arg1": ("int", "blah"), "arg2": ("str", "blah")},),
+        (
+            "arg1, arg2 = 'def,ault'",
+            {"arg1": ("int", "blah"), "arg2": ("str", "blah")},
+        ),
+        ("arg1, arg2 = 3 * 7", {"arg1": ("str", "blah"), "arg2": ("int", "blah")},),
+        (
+            "arg1, *, arg2 = 'default'",
+            {"arg1": ("int", "blah"), "arg2": ("str", "blah")},
+        ),
+    ],
+    ids=[
+        "arg with default value",
+        "arg with default value containing comma",
+        "arg with statement as default value",
+        "signature with keyword-only args",
+    ],
+)
+def test_arg_annotation_signature_validate(signature, arg_annotations):
+    annotations = "\n".join(
+        f"        {name} ({type_}): {description}"
+        for name, (type_, description) in arg_annotations.items()
+    )
+    content = f'''
+def identity({signature}):
+    """
+    Args:
+{annotations}
+    """
+    pass
+'''
+
+    stripped_annotations = "\n".join(
+        f"        {name}: {description}"
+        for name, (_, description) in arg_annotations.items()
+    )
+    str_types = ", ".join(type_ for _, (type_, _) in arg_annotations.items())
+    type_comment = f"# type: ({str_types}) -> None"
+
+    # only builtin types in examples, no imports needed
+    expected = f'''
+def identity({signature}):
+    {type_comment}
+    """
+    Args:
+{stripped_annotations}
+    """
+    pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=True,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+@pytest.mark.parametrize(
+    "signature,arg_annotations",
+    [
         ("arg1, arg2, arg3", {"arg1": ("int", "blah"), "arg2": ("str", "blah")},),
         (
             "arg1, arg2",
