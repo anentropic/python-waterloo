@@ -4,9 +4,10 @@ from typing import Dict, no_type_check, Optional, Union
 from pydantic import BaseSettings, validator
 
 from waterloo.types import (
-    ECHO_STYLES_REQUIRED_FIELDS,
     ImportCollisionPolicy,
+    LogLevel,
     UnpathedTypePolicy,
+    LOG_LEVELS,
 )
 
 
@@ -41,6 +42,8 @@ class Settings(CoerceEnumSettings):
 
     ECHO_STYLES: Optional[Dict[str, str]] = None
 
+    LOG_LEVEL: LogLevel = LogLevel.INFO
+
     @validator('IMPORT_COLLISION_POLICY')
     def key_to_member(
         cls, value: Union[ImportCollisionPolicy, str]
@@ -55,8 +58,8 @@ class Settings(CoerceEnumSettings):
     ) -> Optional[Dict[str, str]]:
         if value is not None:
             assert all(
-                key in value for key in ECHO_STYLES_REQUIRED_FIELDS
-            ), f"missing required keys from {ECHO_STYLES_REQUIRED_FIELDS!r}"
+                key in value for key in LOG_LEVELS.values()
+            ), f"missing required keys from {LOG_LEVELS.values()}"
         return value
 
     def indent(self) -> str:

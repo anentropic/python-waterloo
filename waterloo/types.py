@@ -401,7 +401,20 @@ class UnpathedTypePolicy(Enum):
     FAIL = auto()  # don't annotate, show error
 
 
-ECHO_STYLES_REQUIRED_FIELDS: Final = {'debug', 'info', 'warning', 'error'}
+class LogLevel(Enum):
+    DEBUG = 0
+    INFO = 1
+    WARNING = 2
+    ERROR = 3
+
+
+LOG_LEVELS: Final = {
+    LogLevel.DEBUG: "debug",
+    LogLevel.INFO: "info",
+    LogLevel.WARNING: "warning",
+    LogLevel.ERROR: "error",
+}
+
 
 PRINTABLE_SETTINGS: Final = {
     'PYTHON_VERSION',

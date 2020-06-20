@@ -1,4 +1,4 @@
-.PHONY: pypi, tag, shell, typecheck, pytest, test
+.PHONY: pypi, tag, shell, typecheck, pytest, pytest-pdb, test
 
 pypi:
 	rm -f dist/*
@@ -18,6 +18,9 @@ typecheck:
 	pytype -d import-error waterloo
 
 pytest:
+	py.test -v -s tests/
+
+pytest-pdb:
 	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/
 
 test:

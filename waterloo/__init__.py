@@ -9,7 +9,10 @@ def configuration_factory(settings):
         binder.bind('settings', settings)
         binder.bind(
             'echo',
-            StylePrinter(getattr(settings, 'ECHO_STYLES', None))
+            StylePrinter(
+                style=getattr(settings, 'ECHO_STYLES', None),
+                log_level=settings.LOG_LEVEL,
+            )
         )
     return configure
 

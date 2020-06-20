@@ -39,6 +39,7 @@ from waterloo.types import (
     ImportStrategy,
     TypeSignature,
 )
+from waterloo.utils import StylePrinter
 
 
 # used in bowler subprocesses only (not parent process)
@@ -330,7 +331,12 @@ class AddTypeImports(NonMatchingFixer):
 
 
 @inject.params(settings='settings', echo='echo')
-def annotate(*paths: str, settings: Settings, echo, **execute_kwargs):
+def annotate(
+    *paths: str,
+    settings: Settings = None,
+    echo: StylePrinter = None,
+    **execute_kwargs
+):
     """
     Adds PEP-484 type comments to a set of files, with the import statements
     to support them. Quality of the output very much depends on quality of
