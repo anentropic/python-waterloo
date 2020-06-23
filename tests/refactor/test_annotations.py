@@ -344,6 +344,13 @@ def identity({signature}):
 
 @pytest.mark.parametrize("require_return_type", [True, False])
 def test_require_return_type(require_return_type):
+    """
+    NOTE: here is an example of a function where omitting the "Returns"
+    block from the docstring and setting `REQUIRE_RETURN_TYPE=False` will
+    give the wrong result (...an argument for `REQUIRE_RETURN_TYPE=True`)
+    TODO: I don't know if there is any check for return statements we can
+    do via Bowler?
+    """
     content = '''
 def identity(arg1):
     """
@@ -375,6 +382,56 @@ def identity(arg1):
         test_settings = override_settings(
             ALLOW_UNTYPED_ARGS=False,
             REQUIRE_RETURN_TYPE=require_return_type,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+@pytest.mark.parametrize("python_version", [2, 3])
+def test_returns_none(python_version):
+    content = '''
+def identity(arg1):
+    """
+    Args:
+        arg1 (Tuple[str, ...]): blah
+
+    Returns:
+        None
+    """
+    pass
+'''
+
+    # "Returns" block omitted since there was no description
+    expected = '''from typing import Tuple
+
+
+def identity(arg1):
+    # type: (Tuple[str, ...]) -> None
+    """
+    Args:
+        arg1: blah
+    """
+    pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            PYTHON_VERSION=python_version,
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=True,
             IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
             UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
         )
