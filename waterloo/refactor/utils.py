@@ -54,11 +54,15 @@ def get_type_comment(
     return f"# type: ({args}) -> {returns}"
 
 
+# NOTE: `NotImplemented` and `Ellipsis` are still not handled properly
+# by mypy, see: https://github.com/python/mypy/issues/4791
+VALUE_TYPE_SINGLETONS = {"None", "NotImplemented", "Ellipsis,"}
+
 BUILTIN_TYPE_NAMES = {
     name
     for name in __builtins__.keys()  # type: ignore[attr-defined]
     if not name.startswith("__") and isinstance(eval(name), type)
-}
+} | VALUE_TYPE_SINGLETONS
 
 TYPING_TYPE_NAMES = {
     name
@@ -72,6 +76,9 @@ TYPING_TYPE_NAMES = {
         ),
     )
 }
+
+# NOTE: there is also a `types` module in stdlib containing things such as
+# `ModuleType`... for now Waterloo will need prefixed annotations for these
 
 
 def _is_builtin_type(name: str) -> bool:
