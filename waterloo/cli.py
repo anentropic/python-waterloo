@@ -91,7 +91,7 @@ def main(settings):
         "annotation.",
     )
     annotation_group.add_argument(
-        "-up",
+        "-ut",
         "--unpathed-type-policy",
         default=settings.UNPATHED_TYPE_POLICY.name,
         choices=[m.name for m in UnpathedTypePolicy],
@@ -127,12 +127,36 @@ def main(settings):
         default=False,
         help="Whether to prompt about applying each diff hunk.",
     )
-    apply_group.add_argument(
+
+    logging_group = annotate_cmd.add_argument_group("logging options")
+    logging_group.add_argument(
+        "-l",
+        "--enable-logging",
+        action="store_true",
+        default=False,
+        help="Enable structured logging to stderr.",
+    )
+    logging_group.add_argument(
         "-ll",
         "--log-level",
         default=settings.LOG_LEVEL.name,
         choices=[m.name for m in LogLevel],
-        help="Set the logging level.",
+        help="Set the log level for stderr logging.",
+    )
+    echo_group = logging_group.add_mutually_exclusive_group()
+    echo_group.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="'quiet' mode for minimal details on stdout (filenames, summary stats only).",
+    )
+    echo_group.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=True,  # if this defaulted to False we'd have 3 levels
+        help="'verbose' mode for informative details on stdout (inc. warnings with suggested remedies).",
     )
 
     args = parser.parse_args()
@@ -142,11 +166,18 @@ def main(settings):
         return
     elif args.subparser == "annotate":
         settings.PYTHON_VERSION = args.python_version
+
         settings.ALLOW_UNTYPED_ARGS = args.allow_untyped_args
         settings.REQUIRE_RETURN_TYPE = args.require_return_type
+
         settings.IMPORT_COLLISION_POLICY = args.import_collision_policy
         settings.UNPATHED_TYPE_POLICY = args.unpathed_type_policy
-        settings.LOG_LEVEL = args.log_level
+
+        if args.enable_logging:
+            settings.LOG_LEVEL = args.log_level
+        else:
+            settings.LOG_LEVEL = LogLevel.DISABLED
+        settings.VERBOSE_ECHO = args.verbose and not args.quiet
 
         inject.clear_and_configure(configuration_factory(settings))
 

@@ -17,9 +17,11 @@ toml = "*"
 regex = "*"
 pydantic = "*"
 typing-extensions = "*"
-# bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
 parso = "*"
 inject = "*"
+structlog = "*"
+colorama = "*"
+# bowler = {file = "https://github.com/anentropic/Bowler/tarball/0.8.0-post2"}
 # Bowler deps:
 attrs = "*"
 click = "*"

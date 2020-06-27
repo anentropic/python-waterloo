@@ -40,6 +40,7 @@ class Settings(CoerceEnumSettings):
 
     ECHO_STYLES: Optional[Dict[str, str]] = None
 
+    VERBOSE_ECHO: bool = True
     LOG_LEVEL: LogLevel = LogLevel.INFO
 
     @validator("IMPORT_COLLISION_POLICY")

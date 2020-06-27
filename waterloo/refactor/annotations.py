@@ -1,4 +1,3 @@
-from threading import local
 from typing import Dict, Sequence
 
 import inject
@@ -8,12 +7,14 @@ from fissix.fixer_util import Newline
 from fissix.pgen2 import token
 from fissix.pygram import python_symbols as syms
 from fissix.pytree import Leaf, Node
+from structlog.threadlocal import bind_threadlocal, clear_threadlocal
 
 from waterloo.conf.types import Settings
 from waterloo.parsers.napoleon import docstring_parser
+from waterloo.printer import StylePrinter
 from waterloo.refactor.base import NonMatchingFixer, WaterlooQuery, interrupt_modifier
 from waterloo.refactor.exceptions import Interrupt
-from waterloo.refactor.printer import (
+from waterloo.refactor.reporter import (
     report_ambiguous_type_error,
     report_doc_args_signature_mismatch_error,
     report_incomplete_arg_types,
@@ -30,38 +31,41 @@ from waterloo.refactor.utils import (
     strategy_for_name_factory,
 )
 from waterloo.types import AmbiguousTypeError, ArgTypes, ImportStrategy, TypeSignature
-from waterloo.utils import StylePrinter
-
-# used in bowler subprocesses only (not parent process)
-# for passing data between individual steps processing same source file
-threadlocals = local()
 
 
-@inject.params(settings="settings")
-def _init_threadlocals(filename, settings):
-    global threadlocals
-
+@inject.params(settings="settings", threadlocals="threadlocals")
+def _init_threadlocals(filename, settings, threadlocals):
     threadlocals.settings = settings
 
     local_types = find_local_types(filename)
     threadlocals.strategy_for_name = strategy_for_name_factory(local_types)
     threadlocals.strategy_to_names = {}
 
+    # per-file counters
     threadlocals.docstring_count = 0
     threadlocals.typed_docstring_count = 0
     threadlocals.comment_count = 0
+    threadlocals.warning_count = 0
+    threadlocals.error_count = 0
+
+    # for the structlog logger (it manages its own threadlocals):
+    clear_threadlocal()
+    bind_threadlocal(filename=filename)
 
 
-def _cleanup_threadlocals():
-    global threadlocals
+@inject.params(threadlocals="threadlocals")
+def _cleanup_threadlocals(threadlocals):
     for key in list(threadlocals.__dict__.keys()):
         try:
             delattr(threadlocals, key)
         except AttributeError:
             pass
+    # for the structlog logger:
+    clear_threadlocal()
 
 
-def record_type_names(name_to_strategy: Dict[str, ImportStrategy]):
+@inject.params(threadlocals="threadlocals")
+def record_type_names(name_to_strategy: Dict[str, ImportStrategy], threadlocals):
     for name, strategy in name_to_strategy.items():
         threadlocals.strategy_to_names.setdefault(strategy, set()).add(name)
 
@@ -70,21 +74,45 @@ class StartFile(NonMatchingFixer):
     echo = inject.attr("echo")
 
     def start_tree(self, tree: Node, filename: str) -> None:
-        self.echo.info(f"<b>{filename}</b>")
+        self.echo.info(f"<b>{filename}</b>", verbose=False)
         _init_threadlocals(filename)
 
 
 class EndFile(NonMatchingFixer):
     echo = inject.attr("echo")
+    logger = inject.attr("log")
+    threadlocals = inject.attr("threadlocals")
 
     def finish_tree(self, tree: Node, filename: str) -> None:
-        if threadlocals.comment_count:
+        if self.threadlocals.comment_count:
+            self.logger.info(
+                f"{self.threadlocals.comment_count} type comments added in file."
+            )
             self.echo.info(
-                f"➤➤ <b>{threadlocals.comment_count}</b> type comments added in file 🎉"
+                f"➤➤ <b>{self.threadlocals.comment_count}</b> type comments added in file 🎉",
+                verbose=False,
             )
         else:
-            self.echo.info("➤➤ (no docstrings with annotatable types found in file)")
-        self.echo.info("")
+            self.logger.info("no docstrings with annotatable types found in file.")
+            self.echo.info(
+                "➤➤ (no docstrings with annotatable types found in file)", verbose=False
+            )
+
+        if self.threadlocals.warning_count:
+            self.logger.info(f"{self.threadlocals.warning_count} warnings in file.")
+            self.echo.info(
+                f"➤➤ <b>{self.threadlocals.warning_count}</b> warnings in file ⚠️",
+                verbose=False,
+            )
+
+        if self.threadlocals.error_count:
+            self.logger.info(f"{self.threadlocals.error_count} errors in file.")
+            self.echo.info(
+                f"➤➤ <b>{self.threadlocals.error_count}</b> errors in file 🛑",
+                verbose=False,
+            )
+
+        self.echo.info("", verbose=False)
         _cleanup_threadlocals()
 
 
@@ -106,7 +134,10 @@ def f_not_already_annotated_py2(node: LN, capture: Capture, filename: Filename) 
 
 
 @interrupt_modifier
-def m_add_type_comment(node: LN, capture: Capture, filename: Filename) -> LN:
+@inject.params(threadlocals="threadlocals")
+def m_add_type_comment(
+    node: LN, capture: Capture, filename: Filename, threadlocals
+) -> LN:
     """
     (modifier)
 
@@ -277,10 +308,12 @@ class AddTypeImports(NonMatchingFixer):
     configured via IMPORT_COLLISION_POLICY and UNPATHED_TYPE_POLICY settings.
     """
 
+    threadlocals = inject.attr("threadlocals")
+
     def finish_tree(self, tree: Node, filename: str) -> None:
         # TODO: what about name clash between dotted-path imports and
         # introspected locals?
-        imports_dict = get_import_lines(threadlocals.strategy_to_names)
+        imports_dict = get_import_lines(self.threadlocals.strategy_to_names)
         insert_pos = _find_import_pos(tree)
 
         def _sort_key(val):
@@ -326,7 +359,6 @@ def annotate(
         echo: dependency-injected pretty-printing logger
         **execute_kwargs: passed into the bowler `Query.execute()` method
     """
-    echo.debug("Running with options:")
     report_settings()
 
     q = (
