@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
@@ -351,10 +352,11 @@ class UnpathedTypePolicy(Enum):
 
 
 class LogLevel(Enum):
-    DEBUG = 0
-    INFO = 1
-    WARNING = 2
-    ERROR = 3
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    ERROR = logging.ERROR
+    DISABLED = logging.ERROR + 100
 
 
 LOG_LEVEL_LABELS: Final = {

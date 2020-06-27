@@ -69,7 +69,7 @@ positional arguments:
 | `-aa, --allow-untyped-args` | If any args or return types are found in docstring we can attempt to output a type annotation. If arg types are missing or incomplete, default behaviour is to raise an error. If this flag is set we will instead output an annotation like `(...) -> returnT` which mypy will treat as if all args are `Any`. (default: `False`) |
 | `-rr, --require-return-type` | If any args or return types are found in docstring we can attempt to output a type annotation. If the return type is missing our default behaviour is to assume function should be annotated as returning `-> None`. If this flag is set we will instead raise an error. (default: `False`) |
 | `-ic --import-collision-policy {IMPORT,NO_IMPORT,FAIL}` | There are some cases where it is ambiguous whether we need to add an import for your documented type. This can occur if you gave a dotted package path but there is already a matching `from package import *`, or a relative import of same type name. In both cases it is safest for us to add a new specific import for your type, but it may be redundant. The default option `IMPORT` will add imports. The `NO_IMPORT` option will annotate without adding imports, and will also show a warning message. FAIL will print an error and won't add any annotation. (default: `IMPORT`) |
-| `-up --unpathed-type-policy {IGNORE,WARN,FAIL}` | There are some cases where we cannot determine an appropriate import to add - when your types do not have a dotted path and we can't find a matching type in builtins, typing package or locals. When policy is `IGNORE` we will annotate as documented, you will need to resolve any errors raised by mypy manually. `WARN`option will annotate as documented but also display a warning. `FAIL` will print an error and won't add any annotation. (default: `FAIL`) |
+| `-ut --unpathed-type-policy {IGNORE,WARN,FAIL}` | There are some cases where we cannot determine an appropriate import to add - when your types do not have a dotted path and we can't find a matching type in builtins, typing package or locals. When policy is `IGNORE` we will annotate as documented, you will need to resolve any errors raised by mypy manually. `WARN`option will annotate as documented but also display a warning. `FAIL` will print an error and won't add any annotation. (default: `FAIL`) |
 
 **Apply options:**
 
@@ -78,9 +78,15 @@ positional arguments:
 | `-w, --write` | Whether to apply the changes to target files. Without this flag set waterloo will just perform a 'dry run'. (default: `False`) |
 | `-s, --show-diff` | Whether to print the hunk diffs to be applied. (default: `False`) |
 | `-i, --interactive` | Whether to prompt about applying each diff hunk. (default: `False`) |
-| `-q, --quiet` | Quiet mode will output only warnings and errors. (default: `False`) |
-| `-d, --debug` | Debug mode will also output info and debug messages. (default: `False`) |
-| `-ll {DEBUG,INFO,WARNING,ERROR}, --log-level {DEBUG,INFO,WARNING,ERROR}` | Set the logging level. (default: `INFO`) |
+
+**Logging options:**
+
+| arg  | description |
+| ---- | ----------- |
+| `-l, --enable-logging` | Enable structured logging to stderr. (default: `False`) |
+| `-ll {DEBUG,INFO,WARNING,ERROR}, --log-level {DEBUG,INFO,WARNING,ERROR}` | Set the log level for stderr logging. (default: `INFO`) |
+| `-q, --quiet` | 'quiet' mode for minimal details on stdout (filenames, summary stats only). (default: `False`) |
+| `-v, --verbose` | 'verbose' mode for informative details on stdout (inc. warnings with suggested remedies). (default: `True`) |
 
 **waterloo.toml**
 
@@ -144,8 +150,11 @@ In this docstring, waterloo is able to add the `from engine.models import Produc
 
 If your docstrings don't have dotted paths you will see warnings like:
 ```
-⚠️  Could not determine imports for these types: MysteryType
-   (will assume types already imported or defined in file)
+⚠️  line 231: Ambiguous Type: MysteryType in docstring for def myfunc does not match any builtins, 
+typing.<Type>, imported names or class def in the file, and does not provide a dotted-path we can
+use to add an import statement. However there are some forms we cannot auto-detect which may mean
+no import is needed.
+   ➤ annotation added: will assume no import needed
 ```
 
 Waterloo will still add the annotation to the function, but when you try to run mypy on this file it will complain that `MysteryType` is not imported (if `MysteryType` is not already imported or defined in the file). You will then have to resolve that manually.
