@@ -129,7 +129,7 @@ def report_incomplete_return_type(function: Leaf, settings, echo, log, threadloc
         )
         echo.warning(
             f"⚠️  {msg}\n"
-            f"   ➤ return will be annotated as <b>-> None</b>",
+            f"   ➤ return will be annotated as <b>-&gt; None</b>",
             verbose=True
         )
     # fmt: on
@@ -330,3 +330,23 @@ def _(e: NotFoundNoPathError, function: Leaf, settings, echo, log, threadlocals)
             f"UNPATHED_TYPE_POLICY={settings.UNPATHED_TYPE_POLICY.name}"
         )
     # fmt: on
+
+
+@inject.params(settings="settings", echo="echo", log="log", threadlocals="threadlocals")
+def report_generator_annotation(function: Leaf, settings, echo, log, threadlocals):
+    threadlocals.warning_count += 1
+    log.warning(
+        "Docstring contains a Yields section. We have annotated this as -> Generator[<yield type>, None, None]. "
+        "If you also make use of a SendType and/or ReturnType then you will need to manually update this annotation.",
+        line_no=function.lineno,
+        func_name=function.value,
+    )
+    msg = (
+        f"Function yields: <b>def {function.value}</b> docstring contains a Yields section. We have annotated "
+        f"this as <b>-&gt; Generator[&lt;yield type&gt;, None, None]</b>. If you make use of a SendType and/or ReturnType then "
+        f"you will need to manually update this annotation."
+    )
+    echo.warning(
+        f"⚠️  {msg}\n" f"   ➤ annotation added: check if Generator type is correct",
+        verbose=True,
+    )

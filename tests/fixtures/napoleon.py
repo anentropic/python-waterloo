@@ -118,3 +118,19 @@ def fifth(product_ids, user_id=None):
         bool
     """
     pass
+
+
+def sixth(product_ids):
+    """
+    Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus
+    saepe eveniet ut et voluptates repudiandae sint et molestiae non
+    recusandae.
+
+    Args:
+        product_ids (Iterable[int])
+
+    Yields:
+        int
+    """
+    for id_ in product_ids:
+        yield id_
