@@ -19,6 +19,7 @@ from waterloo.types import (
     NameMatchesRelativeImportError,
     NameToStrategy_T,
     NotFoundNoPathError,
+    ReturnsSection,
     SourcePos,
     TypeAtom,
     TypeDef,
@@ -48,6 +49,8 @@ def get_type_comment(
         args = Types.ELLIPSIS
     if signature.return_type and signature.return_type.type_def:
         returns = signature.return_type.type_def.to_annotation(name_to_strategy)
+        if signature.return_type.name is ReturnsSection.YIELDS:
+            returns = f"Generator[{returns}, None, None]"
     else:
         # to avoid reaching this case, configure REQUIRE_RETURN_TYPE=True
         returns = Types.NONE

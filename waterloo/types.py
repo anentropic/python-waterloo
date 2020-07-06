@@ -206,7 +206,10 @@ class ReturnType:
 
     def type_names(self) -> Set[str]:
         if self.type_def:
-            return self.type_def.type_names()
+            names = self.type_def.type_names()
+            if self.name is ReturnsSection.YIELDS:
+                names.add("Generator")
+            return names
         return set()
 
 

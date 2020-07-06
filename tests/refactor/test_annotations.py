@@ -879,3 +879,55 @@ def two(arg1):
             annotated = fr.read()
 
     assert annotated == expected
+
+
+def test_yields_generator():
+    content = '''
+def generator(arg1):
+    """
+    Args:
+        arg1 (Iterable[int]): blah
+
+    Yields:
+        int: blah
+    """
+    for val in arg1:
+        yield val
+'''
+
+    expected = '''from typing import Generator, Iterable
+
+
+def generator(arg1):
+    # type: (Iterable[int]) -> Generator[int, None, None]
+    """
+    Args:
+        arg1: blah
+
+    Yields:
+        blah
+    """
+    for val in arg1:
+        yield val
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected

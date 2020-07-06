@@ -17,6 +17,7 @@ from waterloo.refactor.exceptions import Interrupt
 from waterloo.refactor.reporter import (
     report_ambiguous_type_error,
     report_doc_args_signature_mismatch_error,
+    report_generator_annotation,
     report_incomplete_arg_types,
     report_incomplete_return_type,
     report_parse_error,
@@ -30,7 +31,13 @@ from waterloo.refactor.utils import (
     remove_types,
     strategy_for_name_factory,
 )
-from waterloo.types import AmbiguousTypeError, ArgTypes, ImportStrategy, TypeSignature
+from waterloo.types import (
+    AmbiguousTypeError,
+    ArgTypes,
+    ImportStrategy,
+    ReturnsSection,
+    TypeSignature,
+)
 
 
 @inject.params(settings="settings", threadlocals="threadlocals")
@@ -194,6 +201,14 @@ def m_add_type_comment(
 
     # yes, annotate...
     threadlocals.typed_docstring_count += 1
+
+    # print(doc_annotation.return_type, doc_annotation.return_type.is_fully_typed, doc_annotation.return_type.name is ReturnsSection.YIELDS)
+    if (
+        doc_annotation.return_type
+        and doc_annotation.return_type.is_fully_typed
+        and doc_annotation.return_type.name is ReturnsSection.YIELDS
+    ):
+        report_generator_annotation(function)
 
     # record the types we found in this docstring
     # and warn/fail on ambiguous types according to IMPORT_COLLISION_POLICY
