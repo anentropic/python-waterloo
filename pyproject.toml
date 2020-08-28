@@ -11,7 +11,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.7"
+python = ">=3.7,<3.9"
 regex = "^2020.2.20"
 fissix = {version = "^19.2b1", allow-prereleases = true}
 typing-extensions = "^3.7.4"
@@ -20,7 +20,7 @@ megaparsy = "^0.1.4"
 typesystem = "^0.2.4"
 prompt-toolkit = "^3.0.3"
 pydantic = "^1.6.1"
-parso = "^0.8.0"
+parso = "^0.7.0,<0.8.0"
 inject = "^4.3.1"
 structlog = "^20.1.0"
 colorama = "^0.4.3"
