@@ -41,7 +41,7 @@ __all__ = ("docstring_parser", "_nested")
 scn = space(char.space1)
 
 # parser which only matches ' ' and '\t', but *not* newlines
-sc = parsy.regex(r"[ |\t]*").result("")
+sc = parsy.regex(r"[ \t]*").result("")
 
 _non_space = parsy.regex(r"\S")
 

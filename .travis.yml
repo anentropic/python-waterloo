@@ -8,8 +8,7 @@ python:
   - "3.7"
   - "3.8"
 install:
-  # poetry refuses to install pytype in travis for some reason
-  - pip install poetry pytype
+  - pip install poetry
   - poetry install
 script:
   - pytype -d import-error waterloo/

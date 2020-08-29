@@ -281,6 +281,7 @@ def test_docstring_parser(docstring):
 
     if context["returns_section"][0]:
         note(f"returns_section: {context['returns_section'][0]}")
+        note(result)
         _validate_returns_section(
             example, result.return_type, context["returns_section"].context,
         )
