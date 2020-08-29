@@ -8,13 +8,8 @@ python:
   - "3.7"
   - "3.8"
 install:
-  - pip install pipenv
-  - pipenv install --dev --skip-lock
-  - pip install .
+  - pip install poetry
+  - poetry install
 script:
-  # pytype does not work under 3.8 yet, and we only need to typecheck one 3.x version
-  - |
-    if (( $(bc -l <<< "${TRAVIS_PYTHON_VERSION} == 3.7") )); then
-      pytype -d import-error waterloo/;
-    fi
+  - pytype -d import-error waterloo/
   - pytest -v tests/

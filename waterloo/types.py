@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections import OrderedDict
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -158,13 +157,13 @@ class TypeDef(NamedTuple):
 @dataclass(frozen=True)
 class ArgTypes:
     name: ArgsSection
-    args: OrderedDict[str, Optional[TypeDef]]
+    args: Dict[str, Optional[TypeDef]]
 
     is_fully_typed: bool
 
     @classmethod
     def factory(
-        cls, name: ArgsSection, args: OrderedDict[str, Optional[TypeDef]]
+        cls, name: ArgsSection, args: Dict[str, Optional[TypeDef]]
     ) -> "ArgTypes":
         """
         We need all args to have a type, otherwise we can't output a valid
@@ -263,7 +262,11 @@ class LocalTypes:
     @classmethod
     def empty(cls) -> "LocalTypes":
         return cls(
-            class_defs=set(), star_imports=set(), names_to_packages={}, all_names=set(),
+            class_defs=set(),
+            star_imports=set(),
+            names_to_packages={},
+            package_imports=set(),
+            all_names=set(),
         )
 
     def update_all_names(self):
