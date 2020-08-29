@@ -22,7 +22,7 @@ For this reason it is best installed using [pipx](https://github.com/pipxproject
 
 ```
 $ pipx install waterloo
-  installed package waterloo 0.7.1, Python 3.7.7
+  installed package waterloo 0.7.2, Python 3.7.7
   These apps are now globally available
     - waterloo
 done! ✨ 🌟 ✨
