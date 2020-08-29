@@ -4,7 +4,7 @@ from typing import Dict
 
 import parsy
 import pytest
-from hypothesis import given, note, strategies as st
+from hypothesis import assume, given, note, strategies as st
 
 from tests.parsers import strategies
 from waterloo.parsers.napoleon import (
@@ -104,6 +104,8 @@ def test_dotted_var_path(segments, trailing_ws, newline):
     optionally followed by non-newline whitespace
     not followed by a newline
     """
+    assume(all("." not in s for s in segments))
+
     # because `dotted_var_path` is built on megaparsy.lexeme it will strip
     # trailing whitespace, and in our test we are explicitly adding trailing
     # whitespace, so strip it from last segment if present
@@ -116,6 +118,7 @@ def test_dotted_var_path(segments, trailing_ws, newline):
         result = dotted_var_path.parse(example)
         assert result == path
     else:
+        note(f"segments: {segments}")
         with pytest.raises(parsy.ParseError):
             dotted_var_path.parse(example)
 
