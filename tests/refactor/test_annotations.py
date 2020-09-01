@@ -63,6 +63,54 @@ def identity(arg1):
     assert annotated == expected
 
 
+def test_handle_splat_args():
+    content = '''
+def identity(arg1, *args, **kwargs):
+    """
+    Args:
+        arg1 (str): blah
+        *args (int)
+        **kwargs (Tuple[bool, ...])
+    """
+    return
+'''
+
+    expected = '''from typing import Tuple
+
+
+def identity(arg1, *args, **kwargs):
+    # type: (str, *int, **Tuple[bool, ...]) -> None
+    """
+    Args:
+        arg1: blah
+        *args
+        **kwargs
+    """
+    return
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
 @pytest.mark.parametrize("allow_untyped_args", [True, False])
 def test_allow_missing_args_section_single_arg(allow_untyped_args):
     content = '''
@@ -216,10 +264,34 @@ def identity():
             "arg1, arg2 = 'def,ault'",
             {"arg1": ("int", "blah"), "arg2": ("str", "blah")},
         ),
-        ("arg1, arg2 = 3 * 7", {"arg1": ("str", "blah"), "arg2": ("int", "blah")},),
         (
-            "arg1, *, arg2 = 'default'",
-            {"arg1": ("int", "blah"), "arg2": ("str", "blah")},
+            "arg1, arg2 = 3 * 7, *args, **kwargs",
+            {
+                "arg1": ("str", "blah"),
+                "arg2": ("int", "blah"),
+                "*args": ("bool", "blah"),
+                "**kwargs": ("float", "blah"),
+            },
+        ),
+        (
+            "arg1, arg2 = (True, False), *args, **kwargs",
+            {
+                "arg1": ("str", "blah"),
+                "arg2": (
+                    "int",
+                    "blah",
+                ),  # wrong type if it was real code, but avoids having optional imports in the test
+                "*args": ("bool", "blah"),
+                "**kwargs": ("float", "blah"),
+            },
+        ),
+        (
+            "arg1, *, arg2 = 'default', **kwargs",
+            {
+                "arg1": ("int", "blah"),
+                "arg2": ("str", "blah"),
+                "**kwargs": ("float", "blah"),
+            },
         ),
         ("self, arg1", {"arg1": ("int", "blah")},),
         ("cls, arg1", {"arg1": ("int", "blah")},),
@@ -227,8 +299,9 @@ def identity():
     ids=[
         "arg with default value",
         "arg with default value containing comma",
-        "arg with statement as default value",
-        "signature with keyword-only args",
+        "arg with statement as default value, *args and **kwargs",
+        "arg with statement containing comma as default value, *args and **kwargs",
+        "signature with keyword-only args and **kwargs",
         "method signature",
         "class-method signature",
     ],
@@ -247,11 +320,22 @@ def identity({signature}):
     pass
 '''
 
+    def splatify(name, type_):
+        if name.startswith("**"):
+            return f"**{type_}"
+        elif name.startswith("*"):
+            return f"*{type_}"
+        else:
+            return type_
+
+    # I guess this is an 'oracle' i.e. an alternate implementation (meh)
     stripped_annotations = "\n".join(
         f"        {name}: {description}"
         for name, (_, description) in arg_annotations.items()
     )
-    str_types = ", ".join(type_ for _, (type_, _) in arg_annotations.items())
+    str_types = ", ".join(
+        splatify(name, type_) for name, (type_, _) in arg_annotations.items()
+    )
     type_comment = f"# type: ({str_types}) -> None"
 
     # only builtin types in examples, no imports needed

@@ -69,6 +69,22 @@ from waterloo.types import (
             ),
             "# type: (str, int, int, Optional[float]) -> Tuple[int, str, ClassName]",
         ),
+        (
+            TypeSignature.factory(
+                arg_types=ArgTypes.factory(
+                    name=ArgsSection.ARGS,
+                    args=OrderedDict(
+                        [
+                            ("regular_arg", TypeAtom("str", [])),
+                            ("*args", TypeAtom("int", [])),
+                            ("**kwargs", TypeAtom("str", [])),
+                        ]
+                    ),
+                ),
+                return_type=None,
+            ),
+            "# type: (str, *int, **str) -> None",
+        ),
     ],
 )
 def test_get_type_comment(example, expected):

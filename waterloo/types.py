@@ -83,34 +83,38 @@ def _repr_type_arg(val, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     """
     Helper for representing a TypeAtom as a type annotation
     """
+    # default case - we should have implementations registered for all
+    # expected types.
     raise TypeError(val)
 
 
 @_repr_type_arg.register
-def _(val: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+def _(name: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     """
     By default we will strip dotted package prefix from type name,
     unless we find ImportStrategy.ADD_DOTTED
     """
     # `val` is the name from TypeAtom
     if name_to_strategy is not None and should_strip_path(
-        val, name_to_strategy.get(val)
+        name, name_to_strategy.get(name)
     ):
-        val = val.rsplit(".", maxsplit=1)[-1]
-    return val
+        name = name.rsplit(".", maxsplit=1)[-1]
+    return name
 
 
 @_repr_type_arg.register
-def _(arg: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
-    return arg.to_annotation(name_to_strategy)
+def _(atom: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    return atom.to_annotation(name_to_strategy)
 
 
 @_repr_type_arg.register(IterableABC)
-def _(val: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]) -> str:
-    if not val:
+def _(
+    type_args: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]
+) -> str:
+    if not type_args:
         return ""
     # recurse
-    sub_args = ", ".join(_repr_type_arg(sub, name_to_strategy) for sub in val)
+    sub_args = ", ".join(_repr_type_arg(sub, name_to_strategy) for sub in type_args)
     return f"[{sub_args}]"
 
 
