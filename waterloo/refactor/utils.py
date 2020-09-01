@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import typing
 from enum import Enum, auto
 from itertools import chain
@@ -27,6 +28,8 @@ from waterloo.types import (
     TypeSignature,
 )
 
+ARG_NAME_RE = re.compile(r"(?P<splat>[*]{0,2})(?P<name>.+)")
+
 
 def get_type_comment(
     signature: TypeSignature, name_to_strategy: NameToStrategy_T
@@ -39,10 +42,16 @@ def get_type_comment(
     Returns:
         a mypy py2 type comment for a function (as a string)
     """
+
+    def arg_annotation(name, atom):
+        splat, _ = ARG_NAME_RE.match(name).groups()
+        annotation = cast(TypeAtom, atom).to_annotation(name_to_strategy)
+        return f"{splat}{annotation}"
+
     if signature.arg_types and signature.arg_types.is_fully_typed:
         args = ", ".join(
-            cast(TypeAtom, atom).to_annotation(name_to_strategy)
-            for atom in signature.arg_types.args.values()
+            arg_annotation(name, atom)
+            for name, atom in signature.arg_types.args.items()
         )
     else:
         # to avoid reaching this case, configure ALLOW_UNTYPED_ARGS=False
@@ -117,6 +126,8 @@ def _flatten_signature(elements: List[Union[Node, Leaf]]) -> Generator[str, None
     Extract arg names from parse tree of function arguments
     """
     name_context = True
+    splat_context = ""
+    splats = {"*", "**"}
     for element in elements:
         if isinstance(element, Leaf):
             if element.value == "=":
@@ -124,12 +135,19 @@ def _flatten_signature(elements: List[Union[Node, Leaf]]) -> Generator[str, None
                 continue
             if element.value == ",":
                 name_context = True
+                splat_context = ""
                 continue
-            if element.value == "*":
-                # signature with keyword-only args
+            if element.value in splats:
+                # possible following nodes:
+                # - ',': i.e. a lone '*', signature has keyword-only args
+                # - name leaf: the name attached to the splat
+                # - some value: the '*' is part of a value expression
+                #   (in this case the splat_context will be reset when we reach next comma)
+                splat_context = element.value
                 continue
             if name_context:
-                yield element.value
+                yield f"{splat_context}{element.value}"
+                splat_context = ""
                 continue
         else:
             # it's a Node, assume we're in value-context and discard

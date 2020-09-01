@@ -2,7 +2,7 @@ import tempfile
 from typing import Dict, Tuple
 
 import inject
-from hypothesis import given, note, strategies as st
+from hypothesis import given, note, settings as hypothesis_settings, strategies as st
 
 from tests.refactor import strategies
 from tests.refactor.types import (
@@ -60,6 +60,7 @@ Cases to test:
 """
 
 
+@hypothesis_settings(deadline=1500)
 @given(
     import_collision_policy=st.sampled_from(ImportCollisionPolicy),
     unpathed_type_policy=st.sampled_from(UnpathedTypePolicy),
