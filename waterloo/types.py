@@ -46,25 +46,22 @@ NameToStrategy_T = Dict[str, "ImportStrategy"]
 
 
 class TypeAtom(NamedTuple):
-    name: str
+    name: Optional[str]
     args: Iterable["TypeAtom"]
 
     def to_annotation(self, name_to_strategy: Optional[NameToStrategy_T]) -> str:
         name = _repr_type_arg(self.name, name_to_strategy)
-        if self.args:
-            args_annotations = _repr_type_arg(self.args, name_to_strategy)
-            return f"{name}{args_annotations}"
-        else:
-            return name
+        args_annotations = _repr_type_arg(
+            self.args,
+            name_to_strategy=name_to_strategy,
+            return_empty_list=(self.name is None),
+        )
+        return f"{name}{args_annotations}"
 
     def type_names(self) -> Set[str]:
-        """
-        TODO:
-        should Callable args list be a TypeAtom with name=None?
-        (...yes I think so)
-        """
         names = set()
-        names.add(self.name)
+        if self.name is not None:
+            names.add(self.name)
         for arg in self.args:
             if isinstance(arg, TypeAtom):
                 names |= arg.type_names()
@@ -103,15 +100,22 @@ def _(name: str, name_to_strategy: Optional[NameToStrategy_T]) -> str:
 
 
 @_repr_type_arg.register
+def _(name: None, name_to_strategy: Optional[NameToStrategy_T]) -> str:
+    return ""
+
+
+@_repr_type_arg.register
 def _(atom: TypeAtom, name_to_strategy: Optional[NameToStrategy_T]) -> str:
     return atom.to_annotation(name_to_strategy)
 
 
 @_repr_type_arg.register(IterableABC)
 def _(
-    type_args: Iterable[TypeAtom], name_to_strategy: Optional[NameToStrategy_T]
+    type_args: Iterable[TypeAtom],
+    name_to_strategy: Optional[NameToStrategy_T],
+    return_empty_list: bool = False,
 ) -> str:
-    if not type_args:
+    if not type_args and not return_empty_list:
         return ""
     # recurse
     sub_args = ", ".join(_repr_type_arg(sub, name_to_strategy) for sub in type_args)

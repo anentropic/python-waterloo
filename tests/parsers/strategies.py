@@ -186,7 +186,7 @@ def homogenous_tuple_typeatom_f(draw, children):
 def callable_typeatom_f(draw, children):
     args_param = draw(small_lists_nonempty_f(children))
     returns_param = draw(children)
-    return TypeAtom(name="Callable", args=(args_param, returns_param))
+    return TypeAtom(name="Callable", args=(TypeAtom(None, args_param), returns_param))
 
 
 @st.composite

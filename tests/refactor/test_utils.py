@@ -89,6 +89,59 @@ from waterloo.types import (
             ),
             "# type: (str, *int, **str) -> None",
         ),
+        (
+            TypeSignature.factory(
+                arg_types=ArgTypes.factory(
+                    name=ArgsSection.ARGS,
+                    args=OrderedDict(
+                        [
+                            (
+                                "f",
+                                TypeAtom(
+                                    "Callable",
+                                    [
+                                        TypeAtom(
+                                            None,
+                                            [TypeAtom("str", []), TypeAtom("bool", [])],
+                                        ),
+                                        TypeAtom("int", []),
+                                    ],
+                                ),
+                            ),
+                        ]
+                    ),
+                ),
+                return_type=None,
+            ),
+            "# type: (Callable[[str, bool], int]) -> None",
+        ),
+        (
+            TypeSignature.factory(
+                arg_types=ArgTypes.factory(
+                    name=ArgsSection.ARGS,
+                    args=OrderedDict(
+                        [
+                            (
+                                "f",
+                                TypeAtom(
+                                    "Callable",
+                                    [TypeAtom(None, []), TypeAtom("int", [])],
+                                ),
+                            ),
+                        ]
+                    ),
+                ),
+                return_type=None,
+            ),
+            "# type: (Callable[[], int]) -> None",
+        ),
+    ],
+    ids=[
+        "mixed-args-simple-return-type",
+        "mixed-args-complex-return-type",
+        "splat-args",
+        "callable-taking-args",
+        "callable-taking-no-args",
     ],
 )
 def test_get_type_comment(example, expected):

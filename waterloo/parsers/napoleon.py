@@ -87,7 +87,7 @@ dotted_var_path = lexeme(
 @parsy.generate
 def _nested() -> parsy.Parser:
     """
-    Recursion helper for `type_atom`
+    Self-referential recursion helper for `type_atom`
 
     (looks for further type defs nested between `[` `]` pairs)
     """
@@ -100,11 +100,37 @@ def _nested() -> parsy.Parser:
     )
 
 
+@parsy.generate
+def _callable() -> parsy.Parser:
+    """
+    Self-referential helper for `type_atom` of Callable type
+
+    AFAIK `Callable` is the only type where one of the expected atom positions
+    (the args of the callable) is a list. Other code is nicer if we treat that
+    bare list as a TypeAtom name=None.
+    """
+    return (
+        yield parsy.seq(
+            parsy.string("Callable"),
+            between(
+                parsy.regex(r"\[\s*"),
+                parsy.regex(r",?\s*\]"),
+                parsy.seq(
+                    _nested.map(lambda args: TypeAtom(None, args))
+                    << parsy.regex(r",\s*"),
+                    type_atom,
+                ),
+            ),
+        ).combine(TypeAtom)
+    )
+
+
 _type_token = dotted_var_path | parsy.string("...")
 
 # mypy type definition, parsed into its nested components
 type_atom = (
-    parsy.seq(_type_token, _nested).combine(TypeAtom)
+    _callable
+    | parsy.seq(_type_token, _nested).combine(TypeAtom)
     | _type_token.map(lambda t: TypeAtom(t, []))
     | _nested  # recurse->
 )

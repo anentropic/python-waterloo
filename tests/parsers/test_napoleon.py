@@ -108,7 +108,17 @@ def test_var_name_invalid(example):
             TypeAtom(
                 "Callable",
                 [
-                    [TypeAtom("int", []), TypeAtom("str", [])],
+                    TypeAtom(None, [TypeAtom("int", []), TypeAtom("str", [])]),
+                    TypeAtom("Dict", [TypeAtom("int", []), TypeAtom("str", [])]),
+                ],
+            ),
+        ),
+        (
+            "Callable[[], Dict[int, str]]",
+            TypeAtom(
+                "Callable",
+                [
+                    TypeAtom(None, []),
                     TypeAtom("Dict", [TypeAtom("int", []), TypeAtom("str", [])]),
                 ],
             ),
