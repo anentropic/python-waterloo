@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "waterloo"
-version = "0.7.4"
+version = "0.7.5"
 license = 'MIT'
 description = "Tool to convert 'typed docstrings' (i.e. Sphinx 'Napoleon' format) to PEP-484 Py2 type comments."
 authors = ["Anentropic <ego@anentropic.com>"]
