@@ -1,7 +1,10 @@
 from collections import OrderedDict
 
+import inject
 import pytest
 
+from tests.utils import override_settings
+from waterloo import configuration_factory
 from waterloo.parsers.napoleon import docstring_parser
 from waterloo.refactor.utils import find_local_types, get_type_comment, remove_types
 from waterloo.types import (
@@ -153,7 +156,8 @@ def test_remove_types(example, expected):
     assert result == expected
 
 
-def test_find_local_types():
+@pytest.mark.parametrize("python_version", ["2.7", "3.6", "3.7", "3.8"])
+def test_find_local_types(python_version):
     expected = LocalTypes.factory(
         type_defs={"T", "TopLevel", "InnerClass"},
         star_imports={"serious"},
@@ -170,6 +174,9 @@ def test_find_local_types():
         },
         package_imports={"logging", "nott.so.serious"},
     )
+
+    test_settings = override_settings(PYTHON_VERSION=python_version)
+    inject.clear_and_configure(configuration_factory(test_settings))
 
     result = find_local_types("tests/fixtures/napoleon.py")
 

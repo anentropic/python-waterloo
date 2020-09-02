@@ -222,7 +222,8 @@ def find_local_types(filename: str, settings) -> LocalTypes:
                 next_sib = next_sib.get_next_sibling()
                 if (
                     next_sib
-                    and next_sib.type == "power"
+                    and next_sib.type in ("power", "atom_expr")  # 2.7 / 3.x variation
+                    and hasattr(next_sib, "children")
                     and next_sib.children[0].type == "name"
                     and next_sib.children[0].value == "TypeVar"
                 ):
