@@ -256,7 +256,7 @@ class TypeSignature:
 
 @dataclass(frozen=True)
 class LocalTypes:
-    class_defs: Set[str]
+    type_defs: Set[str]
     star_imports: Set[str]
     names_to_packages: Dict[str, str]
     package_imports: Set[str]
@@ -266,7 +266,7 @@ class LocalTypes:
     @classmethod
     def empty(cls) -> "LocalTypes":
         return cls(
-            class_defs=set(),
+            type_defs=set(),
             star_imports=set(),
             names_to_packages={},
             package_imports=set(),
@@ -274,24 +274,24 @@ class LocalTypes:
         )
 
     def update_all_names(self):
-        self.all_names.update(self.class_defs | self.names_to_packages.keys())
+        self.all_names.update(self.type_defs | self.names_to_packages.keys())
 
     @classmethod
     def factory(
         cls,
-        class_defs: Set[str],
+        type_defs: Set[str],
         star_imports: Set[str],
         names_to_packages: Dict[str, str],
         package_imports: Set[str],
     ) -> "LocalTypes":
         # should be no overlap in names, that would be a bug in the src file!
-        assert not class_defs & names_to_packages.keys()
+        assert not type_defs & names_to_packages.keys()
         return cls(
-            class_defs=class_defs,
+            type_defs=type_defs,
             star_imports=star_imports,
             names_to_packages=names_to_packages,
             package_imports=package_imports,
-            all_names=class_defs | names_to_packages.keys(),
+            all_names=type_defs | names_to_packages.keys(),
         )
 
     def __contains__(self, name) -> bool:
@@ -301,7 +301,7 @@ class LocalTypes:
         try:
             return self.names_to_packages[name]
         except KeyError:
-            if name in self.class_defs:
+            if name in self.type_defs:
                 return None
             else:
                 raise KeyError(name)

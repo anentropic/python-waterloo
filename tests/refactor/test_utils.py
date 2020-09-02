@@ -3,10 +3,11 @@ from collections import OrderedDict
 import pytest
 
 from waterloo.parsers.napoleon import docstring_parser
-from waterloo.refactor.utils import get_type_comment, remove_types
+from waterloo.refactor.utils import find_local_types, get_type_comment, remove_types
 from waterloo.types import (
     ArgsSection,
     ArgTypes,
+    LocalTypes,
     ReturnsSection,
     ReturnType,
     TypeAtom,
@@ -149,4 +150,27 @@ def test_remove_types(example, expected):
     result = remove_types(example, signature)
 
     print(repr(result))
+    assert result == expected
+
+
+def test_find_local_types():
+    expected = LocalTypes.factory(
+        type_defs={"T", "TopLevel", "InnerClass"},
+        star_imports={"serious"},
+        names_to_packages={
+            "Irrelevant": "..sub",
+            "Nonsense": "..sub",
+            "ReallyUnused": "..sub",
+            "Product": "other.module",
+            "Imported": "some.module",
+            "ConditionallyImported": "some.module",
+            "InnerImported": "some.module",
+            "TypeVar": "typing",
+            "Union": "typing",
+        },
+        package_imports={"logging", "nott.so.serious"},
+    )
+
+    result = find_local_types("tests/fixtures/napoleon.py")
+
     assert result == expected
