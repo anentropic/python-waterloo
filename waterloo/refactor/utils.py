@@ -105,18 +105,6 @@ def _is_dotted_path(name: str) -> bool:
     return "." in name and name != Types.ELLIPSIS
 
 
-def walk_tree(
-    node: parso.tree.NodeOrLeaf,
-) -> Generator[parso.tree.NodeOrLeaf, None, None]:
-    if hasattr(node, "children"):
-        yield node
-        for child in node.children:
-            for subchild in walk_tree(child):
-                yield subchild
-    else:
-        yield node
-
-
 class UnexpectedNodeType(Exception):
     pass
 
@@ -185,6 +173,18 @@ def arg_names_from_signature(signature: List[Union[Node, Leaf]]) -> Set[str]:
     return signature_args
 
 
+def walk_tree(
+    node: parso.tree.NodeOrLeaf,
+) -> Generator[parso.tree.NodeOrLeaf, None, None]:
+    if hasattr(node, "children"):
+        yield node
+        for child in node.children:
+            for subchild in walk_tree(child):
+                yield subchild
+    else:
+        yield node
+
+
 @inject.params(settings="settings")
 def find_local_types(filename: str, settings) -> LocalTypes:
     """
@@ -196,13 +196,14 @@ def find_local_types(filename: str, settings) -> LocalTypes:
     grammar = parso.load_grammar(version=settings.PYTHON_VERSION)
     with open(filename) as f:
         tree = grammar.parse(f.read(), path=filename)
-    class_defs = set()
+
+    type_defs = set()
     star_imports = set()
     names_to_packages = {}
     package_imports = set()
     for node in walk_tree(tree):
         if isinstance(node, parso.python.tree.Class):
-            class_defs.add(node.name.value)
+            type_defs.add(node.name.value)
         elif isinstance(node, parso.python.tree.ImportFrom):
             prefix = "." * node.level
             package = ".".join(name.value for name in node.get_from_names())
@@ -214,8 +215,24 @@ def find_local_types(filename: str, settings) -> LocalTypes:
         elif isinstance(node, parso.python.tree.ImportName):
             paths = node.get_paths()[0]
             package_imports.add(".".join(path.value for path in paths))
+        elif isinstance(node, parso.python.tree.Name):
+            # look for TypeVar defs...
+            next_sib = node.get_next_sibling()
+            if next_sib and next_sib.type == "operator" and next_sib.value == "=":
+                next_sib = next_sib.get_next_sibling()
+                if (
+                    next_sib
+                    and next_sib.type == "power"
+                    and next_sib.children[0].type == "name"
+                    and next_sib.children[0].value == "TypeVar"
+                ):
+                    # NOTE:
+                    # in case like `T = TypeVar('V')` we will take `T` as the type name
+                    # ...I think this reflects how type-checkers will behave
+                    type_defs.add(node.value)
+
     return LocalTypes.factory(
-        class_defs=class_defs,
+        type_defs=type_defs,
         star_imports=star_imports,
         names_to_packages=names_to_packages,
         package_imports=package_imports,

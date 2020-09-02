@@ -2,6 +2,8 @@
 Boring docstring for the module itself
 """
 import logging
+from typing import TypeVar, Union
+
 import nott.so.serious
 from ..sub import Irrelevant, Nonsense, Unused as ReallyUnused
 from serious import *
@@ -13,6 +15,9 @@ if True:
 logger = logging.getLogger(__name__)
 
 SOME_CONST = 1
+
+
+T = TypeVar('V')  # deliberate mismatch...
 
 
 class TopLevel(object):
