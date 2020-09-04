@@ -163,22 +163,33 @@ def test_type_atom_invalid(example):
 
 
 @pytest.mark.parametrize(
-    "example",
+    "example,start_pos,end_pos",
     [
-        "key (str): identifying a specific token bucket",
-        "key (str): ",
-        "key (str):",
-        "key (str)",
+        (
+            "key (str): identifying a specific token bucket",
+            SourcePos(0, 5),
+            SourcePos(0, 8),
+        ),
+        ("key (str): ", SourcePos(0, 5), SourcePos(0, 8)),
+        ("key (str):", SourcePos(0, 5), SourcePos(0, 8)),
+        ("key (str)", SourcePos(0, 5), SourcePos(0, 8)),
+        (
+            """key (
+    str
+)""",
+            SourcePos(1, 4),
+            SourcePos(1, 7),
+        ),
     ],
 )
-def test_arg_type(example):
+def test_arg_type(example, start_pos, end_pos):
     parser = arg_type << rest_of_line
 
     result = parser.parse(example)
 
     assert result == {
         "arg": "key",
-        "type": TypeDef(SourcePos(0, 5), TypeAtom("str", []), SourcePos(0, 8),),
+        "type": TypeDef(start_pos, TypeAtom("str", []), end_pos,),
     }
 
     assert result["type"].name == "str"

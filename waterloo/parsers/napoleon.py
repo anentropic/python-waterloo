@@ -137,9 +137,11 @@ type_atom = (
 
 
 # in "Args" section the type def is in parentheses after the var name
+# fmt: off
 arg_type_def = lexeme(
-    parsy.string("(") >> typed_mark(type_atom, TypeDef) << parsy.string(")")
+    parsy.string("(") >> scn >> typed_mark(type_atom, TypeDef) << scn << parsy.string(")")
 )
+# fmt: on
 
 optional_description = parsy.regex(r"[ |\t]*:") | (
     parsy.regex(r"[ |\t]*") << parsy.regex(r".+").should_fail("no description expected")
