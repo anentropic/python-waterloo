@@ -2,7 +2,8 @@
 Boring docstring for the module itself
 """
 import logging
-from typing import TypeVar, Union
+from collections import namedtuple
+from typing import NamedTuple, TypedDict, TypeVar, Union
 
 import nott.so.serious
 from ..sub import Irrelevant, Nonsense, Unused as ReallyUnused
@@ -17,7 +18,15 @@ logger = logging.getLogger(__name__)
 SOME_CONST = 1
 
 
-T = TypeVar('V')  # deliberate mismatch...
+T = TypeVar('V')  # (deliberate name mismatch)
+
+SomeTuple = namedtuple("_SomeTuple", ["val"])
+
+SomeTypedTuple = NamedTuple("_SomeTypedTuple", (("val", str),))
+
+SomeTypedDict = TypedDict("_SomeTypedDict", val=str)
+
+NewClass = type("_NewClass", (object,), {})
 
 
 class TopLevel(object):

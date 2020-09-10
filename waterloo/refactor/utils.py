@@ -89,6 +89,14 @@ TYPING_TYPE_NAMES = {
     )
 }
 
+ASSIGNMENT_TYPE_DEFS = {
+    "type",
+    "TypeVar",
+    "NamedTuple",
+    "namedtuple",
+    "TypedDict",
+}
+
 # NOTE: there is also a `types` module in stdlib containing things such as
 # `ModuleType`... for now Waterloo will need prefixed annotations for these
 
@@ -220,12 +228,13 @@ def find_local_types(filename: str, settings) -> LocalTypes:
             next_sib = node.get_next_sibling()
             if next_sib and next_sib.type == "operator" and next_sib.value == "=":
                 next_sib = next_sib.get_next_sibling()
+                # this is hacky but it's better than nothing...
                 if (
                     next_sib
                     and next_sib.type in ("power", "atom_expr")  # 2.7 / 3.x variation
                     and hasattr(next_sib, "children")
                     and next_sib.children[0].type == "name"
-                    and next_sib.children[0].value == "TypeVar"
+                    and next_sib.children[0].value in ASSIGNMENT_TYPE_DEFS
                 ):
                     # NOTE:
                     # in case like `T = TypeVar('V')` we will take `T` as the type name

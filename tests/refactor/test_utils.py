@@ -212,7 +212,15 @@ def test_remove_types(example, expected):
 @pytest.mark.parametrize("python_version", ["2.7", "3.6", "3.7", "3.8"])
 def test_find_local_types(python_version):
     expected = LocalTypes.factory(
-        type_defs={"T", "TopLevel", "InnerClass"},
+        type_defs={
+            "T",
+            "TopLevel",
+            "InnerClass",
+            "SomeTuple",
+            "SomeTypedTuple",
+            "SomeTypedDict",
+            "NewClass",
+        },
         star_imports={"serious"},
         names_to_packages={
             "Irrelevant": "..sub",
@@ -222,6 +230,9 @@ def test_find_local_types(python_version):
             "Imported": "some.module",
             "ConditionallyImported": "some.module",
             "InnerImported": "some.module",
+            "namedtuple": "collections",
+            "NamedTuple": "typing",
+            "TypedDict": "typing",
             "TypeVar": "typing",
             "Union": "typing",
         },
