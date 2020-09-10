@@ -24,12 +24,12 @@ from waterloo.refactor.reporter import (
     report_settings,
 )
 from waterloo.refactor.utils import (
+    ImportStrategist,
     arg_names_from_signature,
     find_local_types,
     get_import_lines,
     get_type_comment,
     remove_types,
-    strategy_for_name_factory,
 )
 from waterloo.types import (
     AmbiguousTypeError,
@@ -45,7 +45,7 @@ def _init_threadlocals(filename, settings, threadlocals):
     threadlocals.settings = settings
 
     local_types = find_local_types(filename)
-    threadlocals.strategy_for_name = strategy_for_name_factory(local_types)
+    threadlocals.import_strategist = ImportStrategist(local_types)
     threadlocals.strategy_to_names = {}
 
     # per-file counters
@@ -215,7 +215,7 @@ def m_add_type_comment(
     name_to_strategy: Dict[str, ImportStrategy] = {}
     for name in doc_annotation.type_names():
         try:
-            name_to_strategy[name] = threadlocals.strategy_for_name(name)
+            name_to_strategy[name] = threadlocals.import_strategist.get_for_name(name)
         except AmbiguousTypeError as e:
             report_ambiguous_type_error(e, function)
             if e.should_fail:

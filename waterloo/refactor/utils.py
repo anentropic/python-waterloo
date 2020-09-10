@@ -4,7 +4,7 @@ import re
 import typing
 from enum import Enum, auto
 from itertools import chain
-from typing import Callable, Dict, Generator, List, Optional, Set, Tuple, Union, cast
+from typing import Dict, Generator, List, Optional, Set, Tuple, Union, cast
 
 import inject
 import parso
@@ -240,16 +240,22 @@ def find_local_types(filename: str, settings) -> LocalTypes:
     )
 
 
-@inject.params(settings="settings")
-def strategy_for_name_factory(
-    local_types: LocalTypes, settings,
-) -> Callable[[str], ImportStrategy]:
-    """
-    Args:
-        local_types: names from imports or local ClassDefs
-    """
+class ImportStrategist:
+    _local_types: LocalTypes
 
-    def _strategy_for_name(name: str) -> ImportStrategy:
+    def __init__(self, local_types: LocalTypes):
+        """
+        Args:
+            local_types: names from imports or local ClassDefs
+        """
+        self._local_types = local_types
+
+    @property
+    def local_types(self) -> LocalTypes:
+        return self._local_types
+
+    @inject.params(settings="settings")
+    def get_for_name(self, name: str, settings) -> ImportStrategy:
         """
         We use the following heuristic to determine behaviour for auto-adding
         import statements where possible:
@@ -278,12 +284,12 @@ def strategy_for_name_factory(
             AmbiguousTypeError
         """
         if _is_dotted_path(name):
-            module, name = name.rsplit(".", maxsplit=1)
-            if name in local_types:
-                local_module = local_types[name]
+            module, type_name = name.rsplit(".", maxsplit=1)
+            if type_name in self.local_types:
+                local_module = self.local_types[type_name]
                 if module == local_module:
                     # `module == local_module` means an exact match in imports
-                    # i.e. from <apckage match> import <name match>
+                    # i.e. from <package match> import <name match>
                     return ImportStrategy.USE_EXISTING
                 elif local_module is None:
                     # `local_module is None` means local ClassDef
@@ -296,7 +302,7 @@ def strategy_for_name_factory(
                     else:
                         # TODO in theory we could probably calculate the absolute
                         # import from filename + relative path, but it's awkward
-                        raise NameMatchesLocalClassError(module, name)
+                        raise NameMatchesLocalClassError(module, type_name)
                 elif local_module.startswith("."):
                     # Relative import: "can't tell"
                     # we have a full path so we could add an import
@@ -308,32 +314,40 @@ def strategy_for_name_factory(
                     else:
                         # TODO in theory we could probably calculate the absolute
                         # import from filename + relative path, but it's awkward
-                        raise NameMatchesRelativeImportError(module, name)
+                        raise NameMatchesRelativeImportError(module, type_name)
                 else:
                     # "looks like different path"
                     return ImportStrategy.ADD_DOTTED
             else:
                 # handle * imports? we could assume `name` is imported
                 # if `from module import *` is present... BUT:
-                # if `name.startswith("_")` it would be exempt
+                # if `type_name.startswith("_")` it would be exempt
                 # and `__all__` could break both of these assumptions
                 # So... we treat any matching * import as AMBIGUOUS
-                if module in local_types.star_imports:
+                if module in self.local_types.star_imports:
                     if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
                         # the name was maybe already in scope but it's safe
                         # to add a specific import as well
                         return ImportStrategy.ADD_FROM
                     else:
-                        raise ModuleHasStarImportError(module, name)
-                else:
-                    if module in local_types.package_imports:
-                        return ImportStrategy.USE_EXISTING_DOTTED
-                    else:
+                        raise ModuleHasStarImportError(module, type_name)
+                elif module in self.local_types.type_defs:
+                    if settings.IMPORT_COLLISION_POLICY is ImportCollisionPolicy.IMPORT:
+                        # the name was maybe already in scope but it's safe
+                        # to add a specific import as well
                         return ImportStrategy.ADD_FROM
+                    else:
+                        raise NameMatchesLocalClassError(module, name)
+                elif module in self.local_types.package_imports:
+                    return ImportStrategy.USE_EXISTING_DOTTED
+                elif module in self.local_types.names_to_packages:
+                    return ImportStrategy.USE_EXISTING_DOTTED
+                else:
+                    return ImportStrategy.ADD_FROM
         else:
             if name == Types.ELLIPSIS:
                 return ImportStrategy.USE_EXISTING
-            elif name in local_types:
+            elif name in self.local_types:
                 return ImportStrategy.USE_EXISTING
             elif _is_builtin_type(name):
                 return ImportStrategy.USE_EXISTING
@@ -342,8 +356,6 @@ def strategy_for_name_factory(
             else:
                 # there's no possibility to add an import, so no AUTO option
                 raise NotFoundNoPathError(None, name)
-
-    return _strategy_for_name
 
 
 def get_import_lines(
