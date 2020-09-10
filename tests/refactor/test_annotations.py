@@ -65,7 +65,7 @@ def identity(arg1):
 
 def test_handle_splat_args():
     content = '''
-def identity(arg1, *args, **kwargs):
+def no_op(arg1, *args, **kwargs):
     """
     Args:
         arg1 (str): blah
@@ -78,7 +78,7 @@ def identity(arg1, *args, **kwargs):
     expected = '''from typing import Tuple
 
 
-def identity(arg1, *args, **kwargs):
+def no_op(arg1, *args, **kwargs):
     # type: (str, *int, **Tuple[bool, ...]) -> None
     """
     Args:
@@ -312,7 +312,7 @@ def test_arg_annotation_signature_validate(signature, arg_annotations):
         for name, (type_, description) in arg_annotations.items()
     )
     content = f'''
-def identity({signature}):
+def no_op({signature}):
     """
     Args:
 {annotations}
@@ -340,7 +340,7 @@ def identity({signature}):
 
     # only builtin types in examples, no imports needed
     expected = f'''
-def identity({signature}):
+def no_op({signature}):
     {type_comment}
     """
     Args:
@@ -393,7 +393,7 @@ def test_arg_annotation_signature_mismatch(signature, arg_annotations):
         for name, (type_, description) in arg_annotations.items()
     )
     content = f'''
-def identity({signature}):
+def no_op({signature}):
     """
     Args:
 {annotations}
@@ -484,7 +484,7 @@ def identity(arg1):
 @pytest.mark.parametrize("python_version", [2, 3])
 def test_returns_none(python_version):
     content = '''
-def identity(arg1):
+def no_op(arg1):
     """
     Args:
         arg1 (Tuple[str, ...]): blah
@@ -499,7 +499,7 @@ def identity(arg1):
     expected = '''from typing import Tuple
 
 
-def identity(arg1):
+def no_op(arg1):
     # type: (Tuple[str, ...]) -> None
     """
     Args:
@@ -517,6 +517,195 @@ def identity(arg1):
             ALLOW_UNTYPED_ARGS=False,
             REQUIRE_RETURN_TYPE=True,
             IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+@pytest.mark.parametrize(
+    "import_line,arg_type",
+    [
+        ("from a.package import a_module", "a_module.SomeClass"),
+        ("import a.package.a_module", "a.package.a_module.SomeClass"),
+    ],
+)
+@pytest.mark.parametrize("python_version", [2, 3])
+def test_package_imports(python_version, import_line, arg_type):
+    content = f'''{import_line}
+
+def no_op(arg1):
+    """
+    Args:
+        arg1 ({arg_type}): blah
+    """
+    pass
+'''
+
+    expected = f'''{import_line}
+
+def no_op(arg1):
+    # type: ({arg_type}) -> None
+    """
+    Args:
+        arg1: blah
+    """
+    pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            PYTHON_VERSION=python_version,
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+@pytest.mark.parametrize(
+    "import_collision_policy,expected_import,comment,remove_type",
+    [
+        (
+            ImportCollisionPolicy.IMPORT,
+            "from rest_framework.serializers import Serializer\n",
+            "# type: (Serializer) -> None",
+            True,
+        ),
+        (ImportCollisionPolicy.NO_IMPORT, "", "# type: (Serializer) -> None", True,),
+        (ImportCollisionPolicy.FAIL, "", "", False,),
+    ],
+)
+@pytest.mark.parametrize("python_version", [2, 3])
+def test_dotted_path_annotation_star_import(
+    python_version, import_collision_policy, expected_import, comment, remove_type
+):
+    content = '''from rest_framework.serializers import *
+
+def no_op(arg1):
+    """
+    Args:
+        arg1 (rest_framework.serializers.Serializer): blah
+    """
+    pass
+'''
+
+    if comment:
+        comment = f"{comment}\n    "
+
+    docstring_type = "" if remove_type else " (rest_framework.serializers.Serializer)"
+
+    expected = f'''from rest_framework.serializers import *
+{expected_import}
+def no_op(arg1):
+    {comment}"""
+    Args:
+        arg1{docstring_type}: blah
+    """
+    pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            PYTHON_VERSION=python_version,
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=import_collision_policy,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+@pytest.mark.parametrize(
+    "import_collision_policy,expected_import,comment,remove_type",
+    [
+        (
+            ImportCollisionPolicy.IMPORT,
+            "from serializers import Serializer\n\n",
+            "# type: (Serializer) -> None",
+            True,
+        ),
+        (ImportCollisionPolicy.NO_IMPORT, "", "# type: (Serializer) -> None", True,),
+        (ImportCollisionPolicy.FAIL, "", "", False,),
+    ],
+)
+@pytest.mark.parametrize("python_version", [2, 3])
+def test_dotted_path_annotation_local_type_def(
+    python_version, import_collision_policy, expected_import, comment, remove_type
+):
+    content = '''
+class serializers:
+    # why would you do this
+    pass
+
+def no_op(arg1):
+    """
+    Args:
+        arg1 (serializers.Serializer): blah
+    """
+    pass
+'''
+
+    if comment:
+        comment = f"{comment}\n    "
+
+    docstring_type = "" if remove_type else " (serializers.Serializer)"
+
+    expected = f'''{expected_import}
+class serializers:
+    # why would you do this
+    pass
+
+def no_op(arg1):
+    {comment}"""
+    Args:
+        arg1{docstring_type}: blah
+    """
+    pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            PYTHON_VERSION=python_version,
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=import_collision_policy,
             UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
         )
         inject.clear_and_configure(configuration_factory(test_settings))
