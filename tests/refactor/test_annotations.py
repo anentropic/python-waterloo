@@ -1404,9 +1404,7 @@ class SomeClass:
 
 
 def test_dotted_path_decorator():
-    """
-    First arg is not annotatable
-    """
+    # NOTE: this example is an instance method, so first arg is not annotatable
     content = '''
 class SomeClass:
     @some_package.decorator
