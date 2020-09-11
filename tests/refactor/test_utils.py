@@ -237,6 +237,19 @@ def test_find_local_types(python_version):
             "Union": "typing",
         },
         package_imports={"logging", "nott.so.serious"},
+        signatures={
+            34: ("static", ("cls", "self")),
+            39: ("clsmethod", ("self",)),
+            49: ("method", ("cls",)),
+            53: ("conditionally_defined_method", ("cls",)),
+            57: ("first", ("products", "getter")),
+            77: ("second", ("products", "getter")),
+            97: ("second_inner", ("product", "key", "default")),
+            118: ("third", ("product_ids", "user_id")),
+            133: ("fourth", ("product_id", "user_id")),
+            141: ("fifth", ("product_ids", "user_id")),
+            158: ("sixth", ("product_ids",)),
+        },
     )
 
     test_settings = override_settings(PYTHON_VERSION=python_version)

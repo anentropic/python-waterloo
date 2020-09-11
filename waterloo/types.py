@@ -258,12 +258,22 @@ class TypeSignature:
         return names
 
 
+"""
+Mapping of document line-number to (name, [arg_name, ...])
+
+(for instancemethod and classmethod the non-annotatable initial
+arg has been omitted)
+"""
+Signatures = Dict[int, Tuple[str, Tuple[str, ...]]]
+
+
 @dataclass(frozen=True)
 class LocalTypes:
     type_defs: Set[str]
     star_imports: Set[str]
     names_to_packages: Dict[str, str]
     package_imports: Set[str]
+    signatures: Signatures
 
     all_names: Set[str]
 
@@ -275,10 +285,8 @@ class LocalTypes:
             names_to_packages={},
             package_imports=set(),
             all_names=set(),
+            signatures={},
         )
-
-    def update_all_names(self):
-        self.all_names.update(self.type_defs | self.names_to_packages.keys())
 
     @classmethod
     def factory(
@@ -287,6 +295,7 @@ class LocalTypes:
         star_imports: Set[str],
         names_to_packages: Dict[str, str],
         package_imports: Set[str],
+        signatures: Signatures,
     ) -> "LocalTypes":
         # should be no overlap in names, that would be a bug in the src file!
         assert not type_defs & names_to_packages.keys()
@@ -296,6 +305,7 @@ class LocalTypes:
             names_to_packages=names_to_packages,
             package_imports=package_imports,
             all_names=type_defs | names_to_packages.keys(),
+            signatures=signatures,
         )
 
     def __contains__(self, name) -> bool:

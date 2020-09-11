@@ -8,7 +8,6 @@ from typing import Dict, Generator, List, Optional, Set, Tuple, Union, cast
 
 import inject
 import parso
-from fissix.pygram import python_symbols
 from fissix.pytree import Leaf, Node
 
 from waterloo.types import (
@@ -21,6 +20,7 @@ from waterloo.types import (
     NameToStrategy_T,
     NotFoundNoPathError,
     ReturnsSection,
+    Signatures,
     SourcePos,
     TypeAtom,
     TypeDef,
@@ -151,36 +151,6 @@ def _flatten_signature(elements: List[Union[Node, Leaf]]) -> Generator[str, None
             continue
 
 
-def arg_names_from_signature(signature: List[Union[Node, Leaf]]) -> Set[str]:
-    """
-    Compare the argument names we have parsed from the docstring annotations
-    with those found in the function signature.
-    """
-    # we have either an empty list or a list with one element
-    if signature:
-        element = signature[0]
-
-    # if there are several args the element is a `Node(typedargslist, List[Leaf])`
-    # each arg is either a `Leaf` if it's just a bare arg name
-    # else the arg and default value assignment are a `Node(term, List[Leaf])`
-    # if there's a single arg which is a bare arg name then element is a `Leaf`
-    if not signature:
-        # no args
-        signature_args = set()
-    elif isinstance(element, Leaf):
-        # one bare arg (no value assignment)
-        signature_args = {element.value}
-    else:
-        # multiple args
-        if element.type == python_symbols.typedargslist:
-            signature_args = set(_flatten_signature(element.children))
-        else:
-            raise UnexpectedNodeType(element)
-
-    signature_args -= {"self", "cls"}
-    return signature_args
-
-
 def walk_tree(
     node: parso.tree.NodeOrLeaf,
 ) -> Generator[parso.tree.NodeOrLeaf, None, None]:
@@ -191,6 +161,32 @@ def walk_tree(
                 yield subchild
     else:
         yield node
+
+
+def _is_classmethod(node: parso.tree.Function) -> bool:
+    for decorator in node.get_decorators():
+        if decorator.children[1].value == "classmethod":
+            return True
+    return False
+
+
+def _is_staticmethod(node: parso.tree.Function) -> bool:
+    for decorator in node.get_decorators():
+        if decorator.children[1].value == "staticmethod":
+            return True
+    return False
+
+
+def _is_method(node: parso.tree.Function) -> bool:
+    while node.parent:
+        if node.parent.type == "classdef":
+            return True
+        node = node.parent
+
+
+def _star_prefixed(param: parso.python.Param) -> str:
+    stars = "*" * param.star_count
+    return f"{stars}{param.name.value}"
 
 
 @inject.params(settings="settings")
@@ -209,8 +205,18 @@ def find_local_types(filename: str, settings) -> LocalTypes:
     star_imports = set()
     names_to_packages = {}
     package_imports = set()
+    signatures: Signatures = {}
     for node in walk_tree(tree):
-        if isinstance(node, parso.python.tree.Class):
+        if node.type == "funcdef":
+            # stash the annotatable arg names for every funcdef...
+            name = node.name.value
+            line_no = node.start_pos[0]
+            arg_names = tuple(_star_prefixed(param) for param in node.get_params())
+            if _is_method(node) and not _is_staticmethod(node):
+                arg_names = arg_names[1:]
+            assert line_no not in signatures
+            signatures[line_no] = (name, arg_names)
+        elif isinstance(node, parso.python.tree.Class):
             type_defs.add(node.name.value)
         elif isinstance(node, parso.python.tree.ImportFrom):
             prefix = "." * node.level
@@ -224,8 +230,8 @@ def find_local_types(filename: str, settings) -> LocalTypes:
             paths = node.get_paths()[0]
             package_imports.add(".".join(path.value for path in paths))
         elif isinstance(node, parso.python.tree.Name):
-            # look for TypeVar defs...
             next_sib = node.get_next_sibling()
+            # if node is lhs of an assignment, look for ASSIGNMENT_TYPE_DEFS on rhs...
             if next_sib and next_sib.type == "operator" and next_sib.value == "=":
                 next_sib = next_sib.get_next_sibling()
                 # this is hacky but it's better than nothing...
@@ -246,6 +252,7 @@ def find_local_types(filename: str, settings) -> LocalTypes:
         star_imports=star_imports,
         names_to_packages=names_to_packages,
         package_imports=package_imports,
+        signatures=signatures,
     )
 
 
