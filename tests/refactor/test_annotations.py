@@ -293,8 +293,6 @@ def identity():
                 "**kwargs": ("float", "blah"),
             },
         ),
-        ("self, arg1", {"arg1": ("int", "blah")},),
-        ("cls, arg1", {"arg1": ("int", "blah")},),
     ],
     ids=[
         "arg with default value",
@@ -302,8 +300,6 @@ def identity():
         "arg with statement as default value, *args and **kwargs",
         "arg with statement containing comma as default value, *args and **kwargs",
         "signature with keyword-only args and **kwargs",
-        "method signature",
-        "class-method signature",
     ],
 )
 def test_arg_annotation_signature_validate(signature, arg_annotations):
@@ -354,6 +350,7 @@ def no_op({signature}):
             fw.write(content)
 
         test_settings = override_settings(
+            PYTHON_VERSION="3.8",  # keyword-only args
             ALLOW_UNTYPED_ARGS=True,
             REQUIRE_RETURN_TYPE=False,
             IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
@@ -1182,6 +1179,159 @@ def generator(arg1):
     """
     for val in arg1:
         yield val
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+def test_method():
+    """
+    First arg is not annotatable
+    """
+    content = '''
+class SomeClass:
+    def method(obj, whatever):
+        """
+        Args:
+            whatever (Any)
+        """
+        pass
+'''
+
+    expected = '''from typing import Any
+
+
+class SomeClass:
+    def method(obj, whatever):
+        # type: (Any) -> None
+        """
+        Args:
+            whatever
+        """
+        pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+def test_classmethod():
+    """
+    First arg is not annotatable
+    """
+    content = '''
+class SomeClass:
+    @classmethod
+    def method(obj, whatever):
+        """
+        Args:
+            whatever (Any)
+        """
+        pass
+'''
+
+    expected = '''from typing import Any
+
+
+class SomeClass:
+    @classmethod
+    def method(obj, whatever):
+        # type: (Any) -> None
+        """
+        Args:
+            whatever
+        """
+        pass
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+def test_staticmethod():
+    """
+    First arg *is* annotatable
+    """
+    content = '''
+class SomeClass:
+    @staticmethod
+    def method(obj, whatever):
+        """
+        Args:
+            obj (object)
+            whatever (Any)
+        """
+        pass
+'''
+
+    expected = '''from typing import Any
+
+
+class SomeClass:
+    @staticmethod
+    def method(obj, whatever):
+        # type: (object, Any) -> None
+        """
+        Args:
+            obj
+            whatever
+        """
+        pass
 '''
 
     with tempfile.NamedTemporaryFile(suffix=".py") as f:

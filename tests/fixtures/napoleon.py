@@ -30,7 +30,28 @@ NewClass = type("_NewClass", (object,), {})
 
 
 class TopLevel(object):
-    pass
+    @staticmethod
+    def static(cls, self):
+        return cls, self
+
+    @some_decorator(with_args)
+    @classmethod
+    def clsmethod(cls, self):
+        """
+        Args:
+            self (Any)
+
+        Returns:
+            Any
+        """
+        return self
+
+    def method(obj, cls):
+        return cls
+
+    if SOME_CONST:
+        def conditionally_defined_method(obj, cls):
+            return cls
 
 
 def first(products, getter):

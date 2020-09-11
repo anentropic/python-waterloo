@@ -25,7 +25,6 @@ from waterloo.refactor.reporter import (
 )
 from waterloo.refactor.utils import (
     ImportStrategist,
-    arg_names_from_signature,
     find_local_types,
     get_import_lines,
     get_type_comment,
@@ -45,6 +44,7 @@ def _init_threadlocals(filename, settings, threadlocals):
     threadlocals.settings = settings
 
     local_types = find_local_types(filename)
+    threadlocals.signatures = local_types.signatures
     threadlocals.import_strategist = ImportStrategist(local_types)
     threadlocals.strategy_to_names = {}
 
@@ -155,8 +155,7 @@ def m_add_type_comment(
     # since we filtered for funcs with a docstring, the initial_indent_node
     # should be the indent before the start of the docstring quotes.
     initial_indent = capture["initial_indent_node"]
-    function = capture["function_name"]
-    signature = capture["function_arguments"]
+    function: Leaf = capture["function_name"]
 
     try:
         doc_annotation = docstring_parser.parse(capture["docstring_node"].value)
@@ -170,9 +169,12 @@ def m_add_type_comment(
     annotation_arg_names = (
         doc_annotation.arg_types.args.keys() if doc_annotation.arg_types else set()
     )
-    signature_arg_names = arg_names_from_signature(signature)
+    signature_name, signature_arg_names = threadlocals.signatures[node.get_lineno()]
+    assert signature_name == function.value, f"{signature_name} != {function.value}"
 
-    if doc_annotation.arg_types and not annotation_arg_names == signature_arg_names:
+    if doc_annotation.arg_types and not annotation_arg_names == set(
+        signature_arg_names
+    ):
         report_doc_args_signature_mismatch_error(function)
         raise Interrupt
     # we either have no annotation args, or we do and the names match the signature
