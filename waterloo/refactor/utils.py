@@ -163,16 +163,10 @@ def walk_tree(
         yield node
 
 
-def _is_classmethod(node: parso.tree.Function) -> bool:
-    for decorator in node.get_decorators():
-        if decorator.children[1].value == "classmethod":
-            return True
-    return False
-
-
 def _is_staticmethod(node: parso.tree.Function) -> bool:
     for decorator in node.get_decorators():
-        if decorator.children[1].value == "staticmethod":
+        after_ampersand = decorator.children[1]
+        if after_ampersand.type == "name" and after_ampersand.value == "staticmethod":
             return True
     return False
 

@@ -1354,3 +1354,102 @@ class SomeClass:
             annotated = fr.read()
 
     assert annotated == expected
+
+
+def test_property():
+    """
+    First arg is not annotatable
+    """
+    content = '''
+class SomeClass:
+    @property
+    def method(obj):
+        """
+        Returns:
+            int
+        """
+        return 1
+'''
+
+    expected = '''
+class SomeClass:
+    @property
+    def method(obj):
+        # type: () -> int
+        """
+        """
+        return 1
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
+
+
+def test_dotted_path_decorator():
+    """
+    First arg is not annotatable
+    """
+    content = '''
+class SomeClass:
+    @some_package.decorator
+    def method(cls, obj):
+        """
+        Args:
+            obj (object)
+
+        Returns:
+            int
+        """
+        return 1
+'''
+
+    expected = '''
+class SomeClass:
+    @some_package.decorator
+    def method(cls, obj):
+        # type: (object) -> int
+        """
+        Args:
+            obj
+        """
+        return 1
+'''
+
+    with tempfile.NamedTemporaryFile(suffix=".py") as f:
+        with open(f.name, "w") as fw:
+            fw.write(content)
+
+        test_settings = override_settings(
+            ALLOW_UNTYPED_ARGS=False,
+            REQUIRE_RETURN_TYPE=False,
+            IMPORT_COLLISION_POLICY=ImportCollisionPolicy.IMPORT,
+            UNPATHED_TYPE_POLICY=UnpathedTypePolicy.FAIL,
+        )
+        inject.clear_and_configure(configuration_factory(test_settings))
+
+        annotate(
+            f.name, in_process=True, interactive=False, write=True, silent=True,
+        )
+
+        with open(f.name, "r") as fr:
+            annotated = fr.read()
+
+    assert annotated == expected
